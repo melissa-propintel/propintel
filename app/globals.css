@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f8fafc;
+  --foreground: #0f172a;
+
+  /* PropIntel brand */
+  --pi-navy: #0b1f3a;
+  --pi-navy-soft: #14304f;
+  --pi-accent: #1f6feb;
+  --pi-border: #e2e8f0;
+
+  /* risk grade colors */
+  --risk-a: #15803d;
+  --risk-b: #4d7c0f;
+  --risk-c: #b45309;
+  --risk-d: #c2410c;
+  --risk-f: #b91c1c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-pi-navy: var(--pi-navy);
+  --color-pi-navy-soft: var(--pi-navy-soft);
+  --color-pi-accent: var(--pi-accent);
+  --color-pi-border: var(--pi-border);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
