@@ -26,6 +26,7 @@ export default function LookupPage() {
   const [address, setAddress] = useState("");
   const [intel, setIntel] = useState<MarketIntel | null>(null);
   const [loading, setLoading] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function run(e: React.FormEvent) {
@@ -46,6 +47,30 @@ export default function LookupPage() {
       setError(err instanceof Error ? err.message : "Lookup failed.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function downloadPdf() {
+    if (!intel) return;
+    setDownloading(true);
+    try {
+      const res = await fetch("/api/lookup/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intel }),
+      });
+      if (!res.ok) throw new Error("PDF generation failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${(intel.subject.address || "market-intelligence").replace(/[^\w.-]+/g, "_")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setDownloading(false);
     }
   }
 
@@ -87,6 +112,17 @@ export default function LookupPage() {
 
       {intel && (
         <div className="mt-6 flex flex-col gap-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Market read</h2>
+            <button
+              onClick={downloadPdf}
+              disabled={downloading}
+              className="rounded-md bg-pi-navy px-4 py-1.5 text-sm font-semibold text-white hover:bg-pi-navy-soft disabled:opacity-60"
+            >
+              {downloading ? "Generating…" : "Download PDF report"}
+            </button>
+          </div>
+
           {intel.usingSampleData && (
             <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
               <strong>Sample data.</strong> No Rentcast API key is set yet, so this shows the built-in
