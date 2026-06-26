@@ -108,6 +108,18 @@ export interface LensTake {
   takeaway: string;
 }
 
+export interface NeighborhoodData {
+  floodZone: string | null;
+  floodRisk: string | null;
+  inSFHA: boolean | null; // Special Flood Hazard Area (high risk)
+  vacancyRatePct: number | null;
+  ownerOccupiedPct: number | null;
+  medianHomeValue: number | null;
+  medianHouseholdIncome: number | null;
+  censusTract: string | null;
+  sources: string[];
+}
+
 export interface MarketIntel {
   subject: SubjectProperty;
   ring: CompRing;
@@ -119,6 +131,8 @@ export interface MarketIntel {
   medianDom: number | null;
   lenses: LensTake[];
   comps: Comp[];
+  /** Auto-pulled neighborhood data (FEMA + Census). Null until fetched. */
+  neighborhood: NeighborhoodData | null;
   /** True when the result came from built-in sample data (no API key). */
   usingSampleData: boolean;
 }

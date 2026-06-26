@@ -127,6 +127,23 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     });
   }
 
+  // Neighborhood signals.
+  const nb = intel.neighborhood;
+  if (nb?.inSFHA) {
+    flags.push({
+      severity: "ADVISORY",
+      category: "Flood",
+      line: `In a FEMA Special Flood Hazard Area (zone ${nb.floodZone}). Flood insurance is required — factor the premium into carrying cost and net value.`,
+    });
+  }
+  if (nb?.vacancyRatePct != null && nb.vacancyRatePct >= 15) {
+    flags.push({
+      severity: "ADVISORY",
+      category: "Neighborhood",
+      line: `Census-tract vacancy ${nb.vacancyRatePct}% — elevated. A distressed-area signal that reinforces the absorption read.`,
+    });
+  }
+
   const criticalCount = flags.filter((f) => f.severity === "CRITICAL").length;
   const advisoryCount = flags.filter((f) => f.severity === "ADVISORY").length;
 
@@ -161,15 +178,24 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     { label: "Tax assessed", value: usd(s.taxAssessedValue) },
   ];
 
-  const neighborhood: Fact[] = [
-    { label: "County", value: s.county ?? "—" },
-    { label: "Median days on market", value: intel.medianDom !== null ? `${intel.medianDom} DOM` : "—" },
-    { label: "Active : sold ratio", value: abs.activePerSold !== null ? `${abs.activePerSold} : 1` : "—" },
-  ];
+  const neighborhood: Fact[] = [{ label: "County", value: s.county ?? "—" }];
+  if (nb) {
+    if (nb.floodZone) neighborhood.push({ label: "FEMA flood zone", value: `${nb.floodZone}${nb.inSFHA ? " — high risk" : ""}` });
+    if (nb.floodRisk) neighborhood.push({ label: "Flood risk", value: nb.floodRisk });
+    if (nb.vacancyRatePct != null) neighborhood.push({ label: "Tract vacancy rate", value: `${nb.vacancyRatePct}%` });
+    if (nb.ownerOccupiedPct != null) neighborhood.push({ label: "Owner-occupied", value: `${nb.ownerOccupiedPct}%` });
+    if (nb.medianHomeValue != null) neighborhood.push({ label: "Tract median home value", value: usd(nb.medianHomeValue) });
+    if (nb.medianHouseholdIncome != null) neighborhood.push({ label: "Tract median income", value: usd(nb.medianHouseholdIncome) });
+  }
+  neighborhood.push({ label: "Median days on market", value: intel.medianDom !== null ? `${intel.medianDom} DOM` : "—" });
+  neighborhood.push({ label: "Active : sold ratio", value: abs.activePerSold !== null ? `${abs.activePerSold} : 1` : "—" });
 
+  const hasNbData = !!(nb && (nb.floodZone || nb.vacancyRatePct != null || nb.medianHomeValue != null));
   const pendingNotes = [
     "Condition grade, habitability & field photos: pending field inspection.",
-    "Neighborhood data (crime, schools, flood zone, vacancy, distressed concentration): wiring in progress.",
+    hasNbData
+      ? `Neighborhood: flood + census data shown${nb && nb.sources.length ? " (" + nb.sources.join(", ") + ")" : ""}. Schools, crime & walk score not yet wired.`
+      : "Neighborhood data (flood, vacancy, schools, crime): wiring in progress.",
     testValue === null ? "No loan/list price provided — market support not assessed." : null,
   ].filter((x): x is string => x !== null);
 

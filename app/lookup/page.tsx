@@ -284,6 +284,21 @@ export default function LookupPage() {
             </p>
           </div>
 
+          {/* neighborhood */}
+          {report && report.neighborhood.length > 0 && (
+            <div className="rounded-lg border border-pi-border bg-white p-4">
+              <p className="mb-2 text-sm font-semibold text-pi-navy">Neighborhood</p>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 sm:grid-cols-3">
+                {report.neighborhood.map((f) => (
+                  <div key={f.label} className="flex justify-between gap-2 border-b border-slate-50 py-0.5 text-sm">
+                    <span className="text-slate-500">{f.label}</span>
+                    <span className="font-medium text-slate-800">{f.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* price bands */}
           {intel.priceBands.length > 0 && (
             <div className="rounded-lg border border-pi-border bg-white p-4">

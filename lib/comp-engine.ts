@@ -387,6 +387,7 @@ export function analyzeMarket(
     medianDom: medianDom !== null ? Math.round(medianDom) : null,
     lenses,
     comps: selected,
+    neighborhood: null, // populated by the route after the market analysis
     usingSampleData,
   };
 }
