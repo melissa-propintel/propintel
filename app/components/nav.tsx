@@ -22,7 +22,10 @@ export function Nav() {
             New report
           </Link>
           <Link href="/bulk" className="text-slate-600 hover:text-pi-navy">
-            Bulk upload
+            Portfolio
+          </Link>
+          <Link href="/audit" className="text-slate-600 hover:text-pi-navy">
+            Audit a BPO
           </Link>
           <Link href="/capture" className="text-slate-600 hover:text-pi-navy">
             Field photos
