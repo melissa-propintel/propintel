@@ -336,7 +336,9 @@ export function buildLenses(
 
   const investor =
     oversupplied
-      ? `Buy for the hold, not the flip. With ${abs.headline.toLowerCase()} resale is slow${
+      ? `Buy for the hold, not the flip. With ${abs.active} active vs. ${abs.sold} sold${
+          abs.monthsOfSupply !== null ? ` (${abs.monthsOfSupply} mo supply)` : ""
+        }, resale is slow${
           sitting.length ? ` and the ${sitting.join(", ")} band is stacked` : ""
         }. Underwrite to the low end (${usd(value.low)}) and a longer marketing window${
           medianDom ? ` — median ${medianDom} DOM` : ""
