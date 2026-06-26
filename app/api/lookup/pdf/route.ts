@@ -51,8 +51,20 @@ function usd(n: number | null): string {
   return n === null ? "—" : "$" + Math.round(n).toLocaleString("en-US");
 }
 
+// WinAnsi (Helvetica) can't encode arbitrary Unicode; normalize to a safe set.
+function safe(s: string): string {
+  if (!s) return "";
+  return s
+    .replace(/[‘’‚‛]/g, "'")
+    .replace(/[“”„]/g, '"')
+    .replace(/[–—―]/g, "-")
+    .replace(/…/g, "...")
+    .replace(/[     ​]/g, " ")
+    .replace(/[^\x09\x0A\x0D\x20-\x7E¡-ÿ]/g, "?");
+}
+
 function wrap(t: string, font: PDFFont, size: number, maxW: number): string[] {
-  const words = t.split(/\s+/);
+  const words = safe(t).split(/\s+/);
   const lines: string[] = [];
   let line = "";
   for (const w of words) {
@@ -167,7 +179,7 @@ export async function POST(req: NextRequest) {
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-  const ctx: Ctx = { doc, font, bold, page: doc.addPage([PAGE_W, PAGE_H]), y: PAGE_H - MARGIN, address: s.address };
+  const ctx: Ctx = { doc, font, bold, page: doc.addPage([PAGE_W, PAGE_H]), y: PAGE_H - MARGIN, address: safe(s.address) };
 
   // ===================== PAGE 1 — THE VERDICT =====================
   ctx.page.drawRectangle({ x: 0, y: PAGE_H - 56, width: PAGE_W, height: 56, color: NAVY });
