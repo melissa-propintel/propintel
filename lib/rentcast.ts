@@ -1,0 +1,207 @@
+// Rentcast data client — the national auto-pull (Phase 1).
+//
+// Strategy: request a WIDE radius for both active listings and recent sold
+// comps, normalize everything into our Comp[] type, and let the comp engine
+// build the ½-mile → expand-to-20-25 ring. "Pull wide, narrow in the engine."
+//
+// Set the key in an env var named RENTCAST_API_KEY (Netlify → Site settings →
+// Environment variables, and a local .env.local for dev). No key → callers fall
+// back to the built-in sample.
+//
+// NOTE: the active/sold split is the one spot to tune once we see live
+// responses — Rentcast surfaces active listings via /listings/sale and recent
+// comparable sales via the AVM /avm/value `comparables` array. Both map into the
+// same normalized Comp; the engine treats them identically downstream.
+
+import type { SubjectProperty, Comp, CompStatus } from "./market-data";
+import { distanceMiles } from "./comp-engine";
+
+const BASE = "https://api.rentcast.io/v1";
+const WIDE_RADIUS_MI = 3; // pull wide; the engine trims to ½ mi unless it must expand
+const SOLD_WINDOW_DAYS = 270; // ~9 months of recent sales to choose a 6-mo set from
+
+export function hasRentcastKey(): boolean {
+  return Boolean(process.env.RENTCAST_API_KEY);
+}
+
+function num(v: unknown): number | null {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string" && v.trim() !== "") {
+    const n = Number(v.replace(/[$,]/g, ""));
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
+function str(v: unknown): string | null {
+  return typeof v === "string" && v.trim() !== "" ? v : null;
+}
+
+async function get(path: string, params: Record<string, string | number>): Promise<unknown> {
+  const key = process.env.RENTCAST_API_KEY;
+  if (!key) throw new Error("RENTCAST_API_KEY is not set");
+  const qs = new URLSearchParams(
+    Object.entries(params).map(([k, v]) => [k, String(v)]),
+  ).toString();
+  const res = await fetch(`${BASE}${path}?${qs}`, {
+    headers: { Accept: "application/json", "X-Api-Key": key },
+  });
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(`Rentcast ${path} returned ${res.status}: ${body.slice(0, 300)}`);
+  }
+  return res.json();
+}
+
+// ---- raw shapes (partial, optional-safe) ----
+
+interface RawRecord {
+  id?: string;
+  formattedAddress?: string;
+  addressLine1?: string;
+  city?: string;
+  state?: string;
+  zipCode?: string;
+  county?: string;
+  latitude?: number;
+  longitude?: number;
+  propertyType?: string;
+  bedrooms?: number;
+  bathrooms?: number;
+  squareFootage?: number;
+  lotSize?: number;
+  yearBuilt?: number;
+  price?: number;
+  status?: string;
+  listedDate?: string;
+  removedDate?: string;
+  lastSaleDate?: string;
+  lastSalePrice?: number;
+  daysOnMarket?: number;
+  distance?: number;
+  taxAssessments?: Record<string, { value?: number }>;
+}
+
+interface RawAvm {
+  price?: number;
+  priceRangeLow?: number;
+  priceRangeHigh?: number;
+  latitude?: number;
+  longitude?: number;
+  comparables?: RawRecord[];
+}
+
+function latestTaxAssessment(rec: RawRecord): number | null {
+  const t = rec.taxAssessments;
+  if (!t) return null;
+  const years = Object.keys(t).sort();
+  for (let i = years.length - 1; i >= 0; i--) {
+    const v = num(t[years[i]]?.value);
+    if (v !== null) return v;
+  }
+  return null;
+}
+
+function toSubject(rec: RawRecord, addressFallback: string): SubjectProperty {
+  return {
+    address: str(rec.formattedAddress) ?? str(rec.addressLine1) ?? addressFallback,
+    city: str(rec.city) ?? "",
+    state: str(rec.state) ?? "",
+    zip: str(rec.zipCode) ?? "",
+    county: str(rec.county),
+    latitude: num(rec.latitude),
+    longitude: num(rec.longitude),
+    propertyType: str(rec.propertyType),
+    yearBuilt: num(rec.yearBuilt),
+    beds: num(rec.bedrooms),
+    baths: num(rec.bathrooms),
+    sqft: num(rec.squareFootage),
+    lotSize: num(rec.lotSize),
+    lastSaleDate: str(rec.lastSaleDate),
+    lastSalePrice: num(rec.lastSalePrice),
+    taxAssessedValue: latestTaxAssessment(rec),
+  };
+}
+
+function toComp(
+  rec: RawRecord,
+  status: CompStatus,
+  subjectLat: number | null,
+  subjectLon: number | null,
+): Comp | null {
+  const price = num(rec.price);
+  const sqft = num(rec.squareFootage);
+  const lat = num(rec.latitude);
+  const lon = num(rec.longitude);
+  let dist = num(rec.distance);
+  if (dist === null && lat !== null && lon !== null && subjectLat !== null && subjectLon !== null) {
+    dist = distanceMiles(subjectLat, subjectLon, lat, lon);
+  }
+  if (dist === null) return null; // can't place it on the ring
+  return {
+    id: str(rec.id) ?? `${status}-${str(rec.formattedAddress) ?? Math.round((lat ?? 0) * 1e4)}`,
+    address: str(rec.formattedAddress) ?? str(rec.addressLine1) ?? "(address unavailable)",
+    latitude: lat,
+    longitude: lon,
+    distanceMiles: Math.round(dist * 100) / 100,
+    status,
+    price,
+    soldDate: status === "sold" ? str(rec.removedDate) ?? str(rec.lastSaleDate) : null,
+    listedDate: str(rec.listedDate),
+    daysOnMarket: num(rec.daysOnMarket),
+    beds: num(rec.bedrooms),
+    baths: num(rec.bathrooms),
+    sqft,
+    pricePerSqft: price !== null && sqft !== null && sqft > 0 ? Math.round(price / sqft) : null,
+  };
+}
+
+export interface MarketPull {
+  subject: SubjectProperty;
+  comps: Comp[];
+}
+
+/** Pull subject + active listings + recent sold comps for an address. */
+export async function pullMarketData(address: string): Promise<MarketPull> {
+  // 1. Subject record (also gives us authoritative lat/long).
+  const recs = (await get("/properties", { address, limit: 1 })) as RawRecord[];
+  const rec0 = Array.isArray(recs) ? recs[0] : undefined;
+  if (!rec0) throw new Error(`No property record found for "${address}".`);
+  const subject = toSubject(rec0, address);
+  const { latitude: lat, longitude: lon } = subject;
+
+  const comps: Comp[] = [];
+
+  // 2. Active listings within a wide radius.
+  if (lat !== null && lon !== null) {
+    const actives = (await get("/listings/sale", {
+      latitude: lat,
+      longitude: lon,
+      radius: WIDE_RADIUS_MI,
+      status: "Active",
+      limit: 200,
+    })) as RawRecord[];
+    if (Array.isArray(actives)) {
+      for (const r of actives) {
+        const c = toComp(r, "active", lat, lon);
+        if (c) comps.push(c);
+      }
+    }
+  }
+
+  // 3. Recent sold comps via the AVM comparables set.
+  const avm = (await get("/avm/value", {
+    address,
+    maxRadius: WIDE_RADIUS_MI,
+    daysOld: SOLD_WINDOW_DAYS,
+    compCount: 50,
+  })) as RawAvm;
+  if (avm && Array.isArray(avm.comparables)) {
+    for (const r of avm.comparables) {
+      const c = toComp(r, "sold", lat, lon);
+      if (c) comps.push(c);
+    }
+  }
+
+  return { subject, comps };
+}
