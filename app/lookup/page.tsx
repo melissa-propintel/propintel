@@ -1,12 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { MarketIntel } from "@/lib/market-data";
+import { buildMarketReport, type RiskRating } from "@/lib/market-report";
 
 function usd(n: number | null): string {
   return n === null ? "—" : "$" + Math.round(n).toLocaleString("en-US");
 }
+
+const RATING_BG: Record<RiskRating, string> = {
+  LOW: "bg-emerald-600",
+  MODERATE: "bg-amber-500",
+  HIGH: "bg-orange-600",
+  CRITICAL: "bg-red-600",
+};
+const RATING_WORD: Record<RiskRating, string> = {
+  LOW: "LOW RISK",
+  MODERATE: "MODERATE RISK",
+  HIGH: "HIGH RISK",
+  CRITICAL: "CRITICAL — ESCALATE",
+};
 
 const LEVEL_COLOR: Record<string, string> = {
   TIGHT: "bg-emerald-100 text-emerald-800",
@@ -24,10 +38,20 @@ const VERDICT_COLOR: Record<string, string> = {
 
 export default function LookupPage() {
   const [address, setAddress] = useState("");
+  const [priceStr, setPriceStr] = useState("");
   const [intel, setIntel] = useState<MarketIntel | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const testValue = useMemo(() => {
+    const n = Number(priceStr.replace(/[$,\s]/g, ""));
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [priceStr]);
+  const report = useMemo(
+    () => (intel ? buildMarketReport(intel, { testValue, testLabel: "Loan / list price" }) : null),
+    [intel, testValue],
+  );
 
   async function run(e?: React.FormEvent, addressOverride?: string) {
     e?.preventDefault();
@@ -69,7 +93,7 @@ export default function LookupPage() {
       const res = await fetch("/api/lookup/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intel }),
+        body: JSON.stringify({ intel, meta: { testValue, testLabel: "Loan / list price" } }),
       });
       if (!res.ok) throw new Error("PDF generation failed");
       const blob = await res.blob();
@@ -102,20 +126,28 @@ export default function LookupPage() {
         defensible value range.
       </p>
 
-      <form onSubmit={run} className="mt-5 flex flex-col gap-2 sm:flex-row">
+      <form onSubmit={run} className="mt-5 flex flex-col gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="123 Main St, Cleveland, OH 44109"
+            className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-pi-accent"
+          />
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-md bg-pi-navy px-5 py-2 text-sm font-semibold text-white hover:bg-pi-navy-soft disabled:opacity-60"
+          >
+            {loading ? "Reading market…" : "Run intelligence"}
+          </button>
+        </div>
         <input
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          placeholder="123 Main St, Cleveland, OH 44109"
-          className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-pi-accent"
+          value={priceStr}
+          onChange={(e) => setPriceStr(e.target.value)}
+          placeholder="Optional: loan amount or list price (e.g. 250000) — lets us assess market support"
+          className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-pi-accent"
         />
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-md bg-pi-navy px-5 py-2 text-sm font-semibold text-white hover:bg-pi-navy-soft disabled:opacity-60"
-        >
-          {loading ? "Reading market…" : "Run intelligence"}
-        </button>
       </form>
 
       {error && (
@@ -139,6 +171,59 @@ export default function LookupPage() {
             <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
               <strong>Sample data.</strong> No Rentcast API key is set yet, so this shows the built-in
               demo market. Add <code>RENTCAST_API_KEY</code> to pull live data for any address.
+            </div>
+          )}
+
+          {/* verdict */}
+          {report && (
+            <div className="overflow-hidden rounded-lg border border-pi-border bg-white">
+              <div className={`flex items-center justify-between px-4 py-3 text-white ${RATING_BG[report.rating]}`}>
+                <div>
+                  <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">Overall assessment</p>
+                  <p className="text-xl font-black">{RATING_WORD[report.rating]}</p>
+                </div>
+                <p className="ml-4 max-w-[55%] text-right text-[11px] leading-snug opacity-95">{report.ratingLine}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-5">
+                {[
+                  ["Market support", report.marketSupport.replace("_", " ")],
+                  ["Condition", "Pending"],
+                  ["Fraud signal", "Pending"],
+                  ["Absorption", intel.absorption.level],
+                  ["Red flags", `${report.criticalCount}C · ${report.advisoryCount}A`],
+                ].map(([label, value]) => (
+                  <div key={label} className="bg-white px-3 py-2 text-center">
+                    <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
+                    <p className="mt-0.5 text-xs font-bold text-pi-navy">{value}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="px-4 py-3">
+                <p className="mb-2 text-sm font-semibold text-pi-navy">
+                  Red flags — {report.criticalCount} critical · {report.advisoryCount} advisory
+                </p>
+                {report.flags.length === 0 ? (
+                  <p className="text-sm text-slate-500">No critical or advisory market flags from available data.</p>
+                ) : (
+                  <ul className="flex flex-col gap-1.5">
+                    {report.flags.map((f, i) => (
+                      <li key={i} className="flex gap-2 text-sm">
+                        <span
+                          className={`mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-bold ${
+                            f.severity === "CRITICAL" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
+                          }`}
+                        >
+                          {f.severity}
+                        </span>
+                        <span className="text-slate-700">
+                          <strong className="text-slate-900">{f.category}:</strong> {f.line}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="mt-2 text-[11px] text-slate-400">{report.marketSupportLine}</p>
+              </div>
             </div>
           )}
 
