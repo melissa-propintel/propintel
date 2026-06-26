@@ -170,8 +170,32 @@ export default function CapturePage() {
 
       <h1 className="text-xl font-black text-pi-navy">Photo Capture</h1>
       <p className="mt-1 text-sm text-slate-600">
-        Tap each shot to open your camera. Photos upload as you take them — add a quick note and move on.
+        Tap each box, take or choose the photo, add a quick note — that&apos;s it. Photos upload as you go.
       </p>
+
+      <details className="mt-3 rounded-md border border-pi-border bg-slate-50 p-3 text-xs text-slate-600">
+        <summary className="cursor-pointer font-semibold text-pi-navy">How to use this · camera help</summary>
+        <ol className="mt-2 list-decimal space-y-1 pl-4">
+          <li>Tap a photo box → choose <strong>Take Photo</strong> or <strong>Photo Library</strong>.</li>
+          <li>The photo uploads automatically. Add a quick note.</li>
+          <li>
+            Capture every shot marked <span className="font-bold text-red-500">*</span>. When they all show
+            &ldquo;Saved&rdquo;, you&apos;re done.
+          </li>
+        </ol>
+        <p className="mt-2 font-semibold text-pi-navy">Camera opens to a black screen?</p>
+        <ul className="mt-1 list-disc space-y-1 pl-4">
+          <li>
+            <strong>Easiest fix:</strong> open your phone&apos;s normal <strong>Camera app</strong>, take the
+            photos there, then come back here, tap the box → <strong>Photo Library</strong> and pick them.
+          </li>
+          <li>
+            <strong>Allow the camera:</strong> iPhone → Settings → Safari (or Chrome) → Camera → <strong>Allow</strong>.
+            Android → Settings → Apps → your browser → Permissions → Camera → <strong>Allow</strong>.
+          </li>
+          <li>Still black? Fully close the browser and reopen this page, or restart the phone.</li>
+        </ul>
+      </details>
 
       {!configured && (
         <div className="mt-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-800">
