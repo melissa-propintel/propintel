@@ -77,12 +77,17 @@ export default function LookupPage() {
     }
   }
 
-  // Auto-run when an address is passed from the homepage (/lookup?address=…).
+  // Auto-run + prefill from query params (homepage address box, or an order link).
   useEffect(() => {
-    const q = new URLSearchParams(window.location.search).get("address");
-    if (q) {
-      setAddress(q);
-      void run(undefined, q);
+    const q = new URLSearchParams(window.location.search);
+    const ord = q.get("order");
+    const price = q.get("price");
+    const addr = q.get("address");
+    if (ord) setOrderNumber(ord);
+    if (price) setPriceStr(price);
+    if (addr) {
+      setAddress(addr);
+      void run(undefined, addr);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { REQUIRED_SHOTS, ADDON_SHOTS, PHOTO_BUCKET } from "@/lib/photo-shots";
 import { getSupabase, isStorageConfigured } from "@/lib/supabase-browser";
@@ -76,6 +76,12 @@ export default function CapturePage() {
   const [order, setOrder] = useState("");
   const [shots, setShots] = useState<ShotState[]>(initialShots);
   const configured = isStorageConfigured();
+
+  // When opened from an order assignment link (/capture?order=…), lock to that order.
+  useEffect(() => {
+    const o = new URLSearchParams(window.location.search).get("order");
+    if (o) setOrder(o);
+  }, []);
 
   const requiredDone = useMemo(
     () => shots.filter((s) => s.required).every((s) => s.status === "saved" || s.status === "demo"),

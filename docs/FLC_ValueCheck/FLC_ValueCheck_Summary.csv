@@ -1,0 +1,8 @@
+Loan ID,Address,Seller As-Is,Total Debt,PropIntel As-Is Low,PropIntel As-Is High,Absorption,Months Supply,Debt vs Collateral,PropIntel Note
+603800002,"105 Sherwin St, Enterprise, AL 36330",105000,114008,135000,179000,Balanced,5.5,Supported,Seller's as-is looks conservative vs our comp-supported range
+603600184,"310 53rd St, Fairfield, AL 35064",65000,89105,51000,76000,Soft,7.6,Debt exceeds our high by 17%,Underwater on a soft market
+603600185,"3904 Riviera Rd, Montgomery, AL 36108",75000,73801,64000,109000,Soft,6.5,Supported,Seller value within our range
+603900089,"1480 N Broad St, Cowarts, AL 36321",133000,214455,240000,259000,Oversupplied,12.8,Debt supported but market oversupplied,THIN rural market - treat the range with caution; our value runs well above seller's
+603900087,"715 County Road 24, Scottsboro, AL 35769",500000,932567,337000,495000,Soft,7.6,Debt exceeds our high by 88% - severely underwater,Large/rural property - recommend field verification
+603900088,"830 Somerset Dr, Montgomery, AL 36117",250000,377524,318000,369000,Oversupplied,12.8,Debt exceeds our high by 2%,Oversupplied market - realization risk on time-to-liquidation
+603700037,"1031 Alford Ave, Hoover, AL 35226",280000,313700,312000,425000,Oversupplied,9.0,Supported,Oversupplied - expect longer marketing time

@@ -18,6 +18,9 @@ export function Nav() {
           PropIntel
         </Link>
         <nav className="flex items-center gap-4 text-sm">
+          <Link href="/orders" className="text-slate-600 hover:text-pi-navy">
+            Orders
+          </Link>
           <Link href="/lookup" className="text-slate-600 hover:text-pi-navy">
             New report
           </Link>
