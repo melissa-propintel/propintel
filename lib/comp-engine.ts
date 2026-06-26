@@ -255,9 +255,10 @@ export function buildPriceBands(selected: Comp[]): PriceBand[] {
 // ---- 4. value range ----
 
 /**
- * Defensible as-is range from the SOLD comps: interquartile band of sold prices,
- * cross-checked against per-sqft applied to the subject. A range, never a single
- * number — that's the point.
+ * Defensible as-is range. We read ALL comps for the market story, but the value
+ * RANGE is built from the SOLD comps most similar in size to the subject —
+ * appraiser-style per-sqft on size-matched comps — so heterogeneous markets
+ * don't blow the range out. A range, never a single number.
  */
 export function computeValueRange(
   subject: SubjectProperty,
@@ -274,38 +275,45 @@ export function computeValueRange(
     };
   }
 
-  const soldPrices = solds.map((c) => c.price as number);
-  const pLow = percentile(soldPrices, 0.25);
-  const pHigh = percentile(soldPrices, 0.75);
-
-  const perSqfts = solds
-    .map((c) => c.pricePerSqft)
-    .filter((x): x is number => x !== null && Number.isFinite(x));
-  const psLow = percentile(perSqfts, 0.25);
-  const psHigh = percentile(perSqfts, 0.75);
-
-  // If we have the subject's sqft, reconcile the per-sqft view with the price view.
-  let low = pLow;
-  let high = pHigh;
-  let basis = `Interquartile range of ${solds.length} sold comp${solds.length === 1 ? "" : "s"}.`;
-  if (subject.sqft && psLow !== null && psHigh !== null) {
-    const bySqftLow = psLow * subject.sqft;
-    const bySqftHigh = psHigh * subject.sqft;
-    if (low !== null && high !== null) {
-      low = Math.min(low, bySqftLow);
-      high = Math.max(high, bySqftHigh);
-      basis = `Interquartile range of ${solds.length} sold comps, reconciled with $${Math.round(
-        psLow,
-      )}–$${Math.round(psHigh)}/sqft on ${subject.sqft.toLocaleString()} sqft.`;
+  // Prefer sold comps within ±30% of the subject's size for the value range.
+  let pool = solds;
+  let sizeMatched = false;
+  if (subject.sqft && subject.sqft > 0) {
+    const lo = subject.sqft * 0.7;
+    const hi = subject.sqft * 1.3;
+    const similar = solds.filter((c) => c.sqft !== null && c.sqft >= lo && c.sqft <= hi);
+    if (similar.length >= 4) {
+      pool = similar;
+      sizeMatched = true;
     }
   }
 
+  // Per-sqft method (preferred when we know the subject's size).
+  const perSqfts = pool
+    .map((c) => c.pricePerSqft)
+    .filter((x): x is number => x !== null && Number.isFinite(x));
+  if (subject.sqft && subject.sqft > 0 && perSqfts.length >= 4) {
+    const psLow = percentile(perSqfts, 0.25) as number;
+    const psHigh = percentile(perSqfts, 0.75) as number;
+    return {
+      low: Math.round((psLow * subject.sqft) / 1000) * 1000,
+      high: Math.round((psHigh * subject.sqft) / 1000) * 1000,
+      perSqftLow: Math.round(psLow),
+      perSqftHigh: Math.round(psHigh),
+      basis: `$${Math.round(psLow)}–$${Math.round(psHigh)}/sqft from ${pool.length} ${sizeMatched ? "size-matched " : ""}sold comps applied to ${subject.sqft.toLocaleString()} sqft.`,
+    };
+  }
+
+  // Fallback: interquartile range of sold prices.
+  const prices = pool.map((c) => c.price as number);
+  const pLow = percentile(prices, 0.25);
+  const pHigh = percentile(prices, 0.75);
   return {
-    low: low !== null ? Math.round(low / 1000) * 1000 : null,
-    high: high !== null ? Math.round(high / 1000) * 1000 : null,
-    perSqftLow: psLow !== null ? Math.round(psLow) : null,
-    perSqftHigh: psHigh !== null ? Math.round(psHigh) : null,
-    basis,
+    low: pLow !== null ? Math.round(pLow / 1000) * 1000 : null,
+    high: pHigh !== null ? Math.round(pHigh / 1000) * 1000 : null,
+    perSqftLow: null,
+    perSqftHigh: null,
+    basis: `Interquartile range of ${pool.length} ${sizeMatched ? "size-matched " : ""}sold comp${pool.length === 1 ? "" : "s"}.`,
   };
 }
 
