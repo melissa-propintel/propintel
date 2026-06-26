@@ -230,7 +230,6 @@ export default function CapturePage() {
                 <input
                   type="file"
                   accept="image/*"
-                  capture="environment"
                   className="absolute inset-0 cursor-pointer opacity-0"
                   onChange={(e) => onCapture(shot, e.target.files?.[0])}
                 />

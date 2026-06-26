@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { TAGLINE } from "@/lib/report-standard";
 import { SampleButton } from "@/app/components/sample-button";
+import { AddressBar } from "@/app/components/address-bar";
 
 export default function Home() {
   return (
@@ -20,16 +20,16 @@ export default function Home() {
             defensible value range — so asset managers, portfolio buyers, and lenders decide with
             evidence, not a guess.
           </p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <SampleButton className="rounded-lg bg-white px-6 py-3 text-sm font-semibold text-pi-navy shadow hover:bg-blue-50">
-              View Sample Report →
-            </SampleButton>
-            <Link
-              href="/intake"
-              className="rounded-lg border border-white/40 px-6 py-3 text-sm font-semibold text-white hover:bg-white/10"
-            >
-              New Property Intake
-            </Link>
+          <div className="mt-7">
+            <p className="mb-2 text-sm font-semibold text-white">
+              Start a report — just enter the address. We pull the comps, the market, and the data.
+            </p>
+            <AddressBar />
+            <div className="mt-3">
+              <SampleButton className="text-sm font-semibold text-blue-200 underline underline-offset-2 hover:text-white">
+                Or view a sample report →
+              </SampleButton>
+            </div>
           </div>
         </div>
       </div>

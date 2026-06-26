@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { MarketIntel } from "@/lib/market-data";
 
@@ -29,8 +29,10 @@ export default function LookupPage() {
   const [downloading, setDownloading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function run(e: React.FormEvent) {
-    e.preventDefault();
+  async function run(e?: React.FormEvent, addressOverride?: string) {
+    e?.preventDefault();
+    const a = (addressOverride ?? address).trim();
+    if (!a) return;
     setLoading(true);
     setError(null);
     setIntel(null);
@@ -38,7 +40,7 @@ export default function LookupPage() {
       const res = await fetch("/api/lookup", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address }),
+        body: JSON.stringify({ address: a }),
       });
       const data = (await res.json()) as { intel?: MarketIntel; error?: string };
       if (!res.ok || !data.intel) throw new Error(data.error || "Lookup failed.");
@@ -49,6 +51,16 @@ export default function LookupPage() {
       setLoading(false);
     }
   }
+
+  // Auto-run when an address is passed from the homepage (/lookup?address=…).
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search).get("address");
+    if (q) {
+      setAddress(q);
+      void run(undefined, q);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function downloadPdf() {
     if (!intel) return;
