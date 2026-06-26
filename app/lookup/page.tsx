@@ -39,6 +39,7 @@ const VERDICT_COLOR: Record<string, string> = {
 export default function LookupPage() {
   const [address, setAddress] = useState("");
   const [priceStr, setPriceStr] = useState("");
+  const [orderNumber, setOrderNumber] = useState("");
   const [intel, setIntel] = useState<MarketIntel | null>(null);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(false);
@@ -93,7 +94,7 @@ export default function LookupPage() {
       const res = await fetch("/api/lookup/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intel, meta: { testValue, testLabel: "Loan / list price" } }),
+        body: JSON.stringify({ intel, meta: { testValue, testLabel: "Loan / list price", orderNumber: orderNumber.trim() || undefined } }),
       });
       if (!res.ok) throw new Error("PDF generation failed");
       const blob = await res.blob();
@@ -146,6 +147,12 @@ export default function LookupPage() {
           value={priceStr}
           onChange={(e) => setPriceStr(e.target.value)}
           placeholder="Optional: loan amount or list price (e.g. 250000) — lets us assess market support"
+          className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-pi-accent"
+        />
+        <input
+          value={orderNumber}
+          onChange={(e) => setOrderNumber(e.target.value)}
+          placeholder="Optional: order # — attaches the agent's field photos to the PDF (must match the capture order #)"
           className="rounded-md border border-slate-200 px-3 py-2 text-sm outline-none focus:border-pi-accent"
         />
       </form>

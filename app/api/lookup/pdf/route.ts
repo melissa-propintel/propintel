@@ -8,6 +8,7 @@ import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, RGB } from "pdf-lib"
 import type { MarketIntel } from "@/lib/market-data";
 import { buildMarketReport, type RiskRating } from "@/lib/market-report";
 import { REQUIRED_SHOTS } from "@/lib/photo-shots";
+import { fetchOrderPhotos } from "@/lib/order-photos";
 import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
@@ -342,6 +343,46 @@ export async function POST(req: NextRequest) {
 
   text(ctx, "PENDING / DATA NOTES", { size: 9, font: bold, color: NAVY, gap: 2 });
   for (const n of report.pendingNotes) text(ctx, `• ${n}`, { size: 8, indent: 4, color: LIGHT, gap: 1 });
+
+  // ===================== FIELD PHOTOS (from the order's folder) =====================
+  if (meta.orderNumber) {
+    const photos = await fetchOrderPhotos(meta.orderNumber);
+    if (photos.length > 0) {
+      newPage(ctx, true);
+      sectionTitle(ctx, "Field Photos");
+      const colW = (CONTENT_W - 14) / 2;
+      const maxImgH = 150;
+      const cellH = maxImgH + 28;
+      for (let i = 0; i < photos.length; i += 2) {
+        if (ctx.y - cellH < FOOT_Y + 40) {
+          newPage(ctx, true);
+          sectionTitle(ctx, "Field Photos (cont.)");
+        }
+        const rowTop = ctx.y;
+        for (let c = 0; c < 2; c++) {
+          const p = photos[i + c];
+          if (!p) break;
+          const x = MARGIN + c * (colW + 14);
+          try {
+            const img = p.kind === "png" ? await doc.embedPng(p.bytes) : await doc.embedJpg(p.bytes);
+            const scale = Math.min(colW / img.width, maxImgH / img.height);
+            const w = img.width * scale;
+            const h = img.height * scale;
+            ctx.page.drawImage(img, { x, y: rowTop - h, width: w, height: h });
+          } catch {
+            ctx.page.drawText("(image unavailable)", { x, y: rowTop - 20, size: 7, font, color: LIGHT });
+          }
+          ctx.page.drawText(p.label, { x, y: rowTop - maxImgH - 11, size: 7.5, font: bold, color: NAVY });
+          if (p.comment) {
+            for (const l of wrap(p.comment, font, 7, colW).slice(0, 1)) {
+              ctx.page.drawText(l, { x, y: rowTop - maxImgH - 20, size: 7, font, color: SLATE });
+            }
+          }
+        }
+        ctx.y = rowTop - cellH;
+      }
+    }
+  }
 
   drawFooter(ctx);
 
