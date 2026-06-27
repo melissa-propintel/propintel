@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { REQUIRED_SHOTS, ADDON_SHOTS, PHOTO_BUCKET, type ShotGroup } from "@/lib/photo-shots";
+import { ADDON_SHOTS, PHOTO_BUCKET, requiredShotsFor, type ShotGroup, type PhotoLevel } from "@/lib/photo-shots";
 import { getSupabase, isStorageConfigured } from "@/lib/supabase-browser";
 import { getOrderByNumber } from "@/lib/orders";
 
@@ -29,8 +29,8 @@ function uid(): string {
   return `s${idSeq}`;
 }
 
-function initialShots(): ShotState[] {
-  return REQUIRED_SHOTS.map((s) => ({
+function initialShots(level: PhotoLevel = "full"): ShotState[] {
+  return requiredShotsFor(level).map((s) => ({
     id: uid(),
     key: s.key,
     label: s.label,
@@ -46,7 +46,7 @@ function initialShots(): ShotState[] {
   }));
 }
 
-async function downscale(file: File, maxDim = 1600, quality = 0.82): Promise<Blob> {
+async function downscale(file: File, maxDim = 1200, quality = 0.78): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
     let { width, height } = bitmap;
@@ -85,9 +85,13 @@ export default function CapturePage() {
   const configured = isStorageConfigured();
   const shotRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  // From an order assignment link (/capture?order=…): lock the order + load the address.
+  // From an order assignment link (/capture?order=…&level=…): lock the order,
+  // load the address, and use the lite/full shot set.
   useEffect(() => {
-    const o = new URLSearchParams(window.location.search).get("order");
+    const q = new URLSearchParams(window.location.search);
+    const lvl = q.get("level");
+    if (lvl === "lite") setShots(initialShots("lite"));
+    const o = q.get("order");
     if (!o) return;
     setOrder(o);
     setLockedOrder(true);

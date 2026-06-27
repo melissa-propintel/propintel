@@ -8,6 +8,8 @@ import {
   updateOrder,
   generateOrderNumber,
   ordersConfigured,
+  isFieldProduct,
+  photoLevel,
   STATUS_FLOW,
   type Order,
   type OrderStatus,
@@ -97,7 +99,7 @@ export default function OrdersPage() {
 
   function agentLink(o: Order): string {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
-    return `${origin}/capture?order=${encodeURIComponent(o.order_number)}`;
+    return `${origin}/capture?order=${encodeURIComponent(o.order_number)}&level=${photoLevel(o.product_type)}`;
   }
   function reportLink(o: Order): string {
     const p = new URLSearchParams({ address: o.property_address, order: o.order_number });
@@ -135,7 +137,7 @@ export default function OrdersPage() {
 
   async function maybeEmailAgent(o: Order, value: string) {
     const email = value.match(EMAIL_RE)?.[0];
-    if (!email || o.product_type !== "field") return;
+    if (!email || !isFieldProduct(o.product_type)) return;
     setSendMsg((m) => ({ ...m, [o.id]: "Sending…" }));
     try {
       const res = await fetch("/api/agent-invite", {
@@ -146,6 +148,7 @@ export default function OrdersPage() {
           address: o.property_address,
           agentEmail: email,
           agentName: value.replace(EMAIL_RE, "").replace(/[<>]/g, "").trim() || undefined,
+          level: photoLevel(o.product_type),
         }),
       });
       const data = (await res.json()) as { sent?: boolean; notConfigured?: boolean; error?: string };
@@ -185,7 +188,8 @@ export default function OrdersPage() {
             <input value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Property address" className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
             <select value={product} onChange={(e) => setProduct(e.target.value as ProductType)} className="rounded-md border border-slate-300 px-3 py-2 text-sm">
               <option value="desktop">Desktop value-check (no site visit)</option>
-              <option value="field">Field report (agent photos)</option>
+              <option value="field_lite">Field — Lite (drive-by: front + neighbors, 4 shots)</option>
+              <option value="field_full">Field — Full inspection (sides, roof, mechanicals, interior)</option>
             </select>
             <input value={loan} onChange={(e) => setLoan(e.target.value)} placeholder="Loan / list price (optional)" className="rounded-md border border-slate-300 px-3 py-2 text-sm" />
           </div>
@@ -227,7 +231,7 @@ export default function OrdersPage() {
                         {STATUS_FLOW.map((s) => <option key={s} value={s}>{s.replace("_", " ")}</option>)}
                       </select>
                       <div className="flex items-center gap-3 text-xs">
-                        {o.product_type === "field" && (
+                        {isFieldProduct(o.product_type) && (
                           <button onClick={() => copyAgentLink(o)} className="text-pi-accent hover:underline">
                             {copied === o.id ? "Link copied!" : "Copy agent link"}
                           </button>
@@ -236,7 +240,7 @@ export default function OrdersPage() {
                       </div>
                     </div>
                   </div>
-                  {o.product_type === "field" && (
+                  {isFieldProduct(o.product_type) && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] uppercase tracking-wide text-slate-400">Agent</span>
                       {agents.length > 0 ? (

@@ -28,6 +28,15 @@ export const REQUIRED_SHOTS: ShotDef[] = [
   { key: "water-heater", label: "Hot water heater", hint: "The water heater tank", required: true, group: "Mechanicals" },
 ];
 
+// Lite (drive-by) shot set — front + neighbors + across street.
+export const LITE_KEYS = ["front", "left-neighbor", "right-neighbor", "across-street"];
+
+export type PhotoLevel = "lite" | "full";
+
+export function requiredShotsFor(level: PhotoLevel): ShotDef[] {
+  return level === "lite" ? REQUIRED_SHOTS.filter((s) => LITE_KEYS.includes(s.key)) : REQUIRED_SHOTS;
+}
+
 // Repeatable add-ons — agent adds as many as needed.
 export const ADDON_SHOTS: { key: string; label: string; hint: string; group: ShotGroup }[] = [
   { key: "room", label: "Interior room", hint: "If you have interior access — every room", group: "Interior" },

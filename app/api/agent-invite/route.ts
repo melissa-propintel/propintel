@@ -9,8 +9,9 @@ export const runtime = "nodejs";
 
 const FROM = process.env.AGENT_INVITE_FROM || "PropIntel <orders@propintelreport.com>";
 
-function captureUrl(origin: string, orderNumber: string): string {
-  return `${origin}/capture?order=${encodeURIComponent(orderNumber)}`;
+function captureUrl(origin: string, orderNumber: string, level: string): string {
+  const lvl = level === "lite" ? "lite" : "full";
+  return `${origin}/capture?order=${encodeURIComponent(orderNumber)}&level=${lvl}`;
 }
 
 function emailHtml(opts: { link: string; address: string; orderNumber: string; agentName?: string; dueDate?: string }): string {
@@ -45,7 +46,7 @@ function emailHtml(opts: { link: string; address: string; orderNumber: string; a
 }
 
 export async function POST(req: Request) {
-  let body: { orderNumber?: string; address?: string; agentEmail?: string; agentName?: string; dueDate?: string };
+  let body: { orderNumber?: string; address?: string; agentEmail?: string; agentName?: string; dueDate?: string; level?: string };
   try {
     body = await req.json();
   } catch {
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
   }
 
   const origin = new URL(req.url).origin;
-  const link = captureUrl(origin, orderNumber);
+  const link = captureUrl(origin, orderNumber, body.level ?? "full");
   const html = emailHtml({
     link,
     address: body.address ?? "",

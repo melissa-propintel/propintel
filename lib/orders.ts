@@ -4,9 +4,27 @@
 import { getSupabase, isStorageConfigured } from "./supabase-browser";
 
 export type OrderStatus = "new" | "assigned" | "in_progress" | "ready" | "delivered";
-export type ProductType = "desktop" | "field";
+// "field" is the legacy umbrella value (treated as full); new orders use the split.
+export type ProductType = "desktop" | "field" | "field_lite" | "field_full";
 
 export const STATUS_FLOW: OrderStatus[] = ["new", "assigned", "in_progress", "ready", "delivered"];
+
+/** Any field-photo product (lite, full, or legacy "field"). */
+export function isFieldProduct(p: string): boolean {
+  return p.startsWith("field");
+}
+
+/** Which photo set the agent should capture. Legacy "field" = full. */
+export function photoLevel(p: string): "lite" | "full" {
+  return p === "field_lite" ? "lite" : "full";
+}
+
+export const PRODUCT_LABEL: Record<string, string> = {
+  desktop: "Desktop value-check (no site visit)",
+  field_lite: "Field — Lite (drive-by: front + neighbors)",
+  field_full: "Field — Full inspection (all sides, mechanicals, interior)",
+  field: "Field report",
+};
 
 export interface Order {
   id: string;
