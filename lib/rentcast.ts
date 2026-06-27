@@ -161,26 +161,70 @@ export interface MarketPull {
   comps: Comp[];
 }
 
-/** Pull subject + active listings + recent sold comps for an address. */
-export async function pullMarketData(address: string): Promise<MarketPull> {
-  // 1. Subject record (also gives us authoritative lat/long).
-  const recs = (await get("/properties", { address, limit: 1 })) as RawRecord[];
-  const rec0 = Array.isArray(recs) ? recs[0] : undefined;
-  if (!rec0) throw new Error(`No property record found for "${address}".`);
-  const subject = toSubject(rec0, address);
-  const { latitude: lat, longitude: lon } = subject;
+async function tryGet(path: string, params: Record<string, string | number>): Promise<unknown> {
+  try {
+    return await get(path, params);
+  } catch {
+    return null; // tolerate a 404/no-match on one source; we fall back to others
+  }
+}
 
+/** Pull subject + active listings + recent sold comps for an address.
+ *  Robust to addresses Rentcast has no property record for: falls back to the
+ *  AVM endpoint (which geocodes the address itself) for lat/long + sold comps. */
+export async function pullMarketData(address: string): Promise<MarketPull> {
+  // 1. Subject record (best source — full characteristics + authoritative lat/long).
+  const recs = (await tryGet("/properties", { address, limit: 1 })) as RawRecord[] | null;
+  const rec0 = Array.isArray(recs) ? recs[0] : undefined;
+  let subject = rec0 ? toSubject(rec0, address) : null;
+
+  // 2. AVM — sold comps, and a lat/long + value fallback if there was no record.
+  const avm = (await tryGet("/avm/value", {
+    address,
+    maxRadius: WIDE_RADIUS_MI,
+    daysOld: SOLD_WINDOW_DAYS,
+    compCount: 50,
+  })) as RawAvm | null;
+
+  // Build a subject from the AVM response when the property record was missing.
+  if (!subject) {
+    const lat = num(avm?.latitude);
+    const lon = num(avm?.longitude);
+    if (lat === null || lon === null) {
+      throw new Error(`No data found for "${address}". Verify the address (street, city, state, zip) — it may not be in coverage.`);
+    }
+    subject = {
+      address,
+      city: "",
+      state: "",
+      zip: "",
+      county: null,
+      latitude: lat,
+      longitude: lon,
+      propertyType: null,
+      yearBuilt: null,
+      beds: null,
+      baths: null,
+      sqft: null,
+      lotSize: null,
+      lastSaleDate: null,
+      lastSalePrice: null,
+      taxAssessedValue: null,
+    };
+  }
+
+  const { latitude: lat, longitude: lon } = subject;
   const comps: Comp[] = [];
 
-  // 2. Active listings within a wide radius.
+  // 3. Active listings within a wide radius (needs lat/long).
   if (lat !== null && lon !== null) {
-    const actives = (await get("/listings/sale", {
+    const actives = (await tryGet("/listings/sale", {
       latitude: lat,
       longitude: lon,
       radius: WIDE_RADIUS_MI,
       status: "Active",
       limit: 200,
-    })) as RawRecord[];
+    })) as RawRecord[] | null;
     if (Array.isArray(actives)) {
       for (const r of actives) {
         const c = toComp(r, "active", lat, lon);
@@ -189,13 +233,7 @@ export async function pullMarketData(address: string): Promise<MarketPull> {
     }
   }
 
-  // 3. Recent sold comps via the AVM comparables set.
-  const avm = (await get("/avm/value", {
-    address,
-    maxRadius: WIDE_RADIUS_MI,
-    daysOld: SOLD_WINDOW_DAYS,
-    compCount: 50,
-  })) as RawAvm;
+  // 4. Recent sold comps from the AVM comparables set.
   if (avm && Array.isArray(avm.comparables)) {
     for (const r of avm.comparables) {
       const c = toComp(r, "sold", lat, lon);
