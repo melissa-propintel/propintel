@@ -8,13 +8,13 @@ import type {
   Habitability,
 } from "./types";
 
-// Core positioning — appears as a footer on every page. Non-negotiable.
+// Core positioning — appears as a footer on every page.
 export const DISCLAIMER =
-  "PropIntel is a data and documentation company. This report does not constitute an appraisal, " +
-  "licensed opinion of value, or investment advice. The lender makes all credit decisions " +
-  "independently based on their own underwriting criteria.";
+  "PropIntel is a data and documentation company. This report does not constitute an appraisal or a " +
+  "licensed opinion of value. The indicated range is supported by current market comparables; the " +
+  "client makes all decisions independently based on their own criteria.";
 
-export const TAGLINE = "We stop fraud before the money moves.";
+export const TAGLINE = "Property intelligence — better than a BPO.";
 
 export interface RiskGradeDef {
   grade: RiskGrade;

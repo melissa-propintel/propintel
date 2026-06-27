@@ -27,6 +27,10 @@ export interface MarketReport {
   ratingLine: string;
   marketSupport: MarketSupport;
   marketSupportLine: string;
+  hasTestValue: boolean; // true only when a loan/list price was provided
+  saleability: string; // "Strong" | "Healthy" | "Moderate" | "Slow" | "Very slow"
+  saleabilityLine: string;
+  suggestedListPrice: number | null; // price to list at to sell in a normal window
   conditionStatus: string;
   fraudStatus: string;
   flags: ReportFlag[];
@@ -56,11 +60,40 @@ function supportOf(testValue: number | null, high: number | null): MarketSupport
 }
 
 const RATING_LINE: Record<RiskRating, string> = {
-  LOW: "Market evidence supports proceeding. No critical market issues found.",
-  MODERATE: "Workable, with advisory items to weigh before proceeding.",
-  HIGH: "Material market issues present — senior review warranted before funding/listing.",
-  CRITICAL: "Market evidence does not support the assumption. Do not proceed without escalation.",
+  LOW: "Strong value support. Comps and absorption back the indicated range.",
+  MODERATE: "Solid value with items to weigh — note the advisory flags below.",
+  HIGH: "Value is supportable but carries material market risk — see flags.",
+  CRITICAL: "Value is at material risk — the market does not support a confident number.",
 };
+
+// Saleability + a recommended list price, derived from absorption + value range.
+function saleabilityOf(level: string): { label: string; line: string } {
+  switch (level) {
+    case "TIGHT":
+      return { label: "Strong", line: "Seller's market — homes clear quickly at the supported price." };
+    case "BALANCED":
+      return { label: "Healthy", line: "Balanced market — reasonable absorption at the supported price." };
+    case "SOFT":
+      return { label: "Moderate", line: "Softening market — price toward the middle and expect a longer window." };
+    case "OVERSUPPLIED":
+      return { label: "Slow", line: "Oversupplied — price competitively to move it; expect extended marketing time." };
+    case "SEVERE":
+      return { label: "Very slow", line: "Severely oversupplied — inventory isn't clearing; price aggressively or hold." };
+    default:
+      return { label: "Moderate", line: "Absorption read pending more sold activity." };
+  }
+}
+
+function suggestedListOf(low: number | null, high: number | null, level: string): number | null {
+  if (low === null || high === null) return null;
+  const mid = (low + high) / 2;
+  let p: number;
+  if (level === "TIGHT") p = high;
+  else if (level === "BALANCED") p = (mid + high) / 2;
+  else if (level === "SOFT") p = mid;
+  else p = (low + mid) / 2; // OVERSUPPLIED / SEVERE — price to move
+  return Math.round(p / 1000) * 1000;
+}
 
 export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}): MarketReport {
   const abs = intel.absorption;
@@ -162,9 +195,14 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     rating = "LOW";
   }
 
+  const sale = saleabilityOf(abs.level);
+  const suggestedListPrice = suggestedListOf(value.low, value.high, abs.level);
+
   const marketSupportLine =
     marketSupport === "NOT_ASSESSED"
-      ? "Add a loan amount or list price to assess support and value gap."
+      ? `Indicated as-is value ${usd(value.low)}–${usd(value.high)}${
+          suggestedListPrice ? `; suggested list ${usd(suggestedListPrice)}` : ""
+        }.`
       : `${testLabel} ${usd(testValue)} vs. comp-supported high ${usd(value.high)} — ${marketSupport.replace("_", " ").toLowerCase()}.`;
 
   const s = intel.subject;
@@ -192,11 +230,10 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
 
   const hasNbData = !!(nb && (nb.floodZone || nb.vacancyRatePct != null || nb.medianHomeValue != null));
   const pendingNotes = [
-    "Condition grade, habitability & field photos: pending field inspection.",
+    "Condition grade & field photos: from the field agent's inspection (if a field order).",
     hasNbData
       ? `Neighborhood: flood + census data shown${nb && nb.sources.length ? " (" + nb.sources.join(", ") + ")" : ""}. Schools, crime & walk score not yet wired.`
       : "Neighborhood data (flood, vacancy, schools, crime): wiring in progress.",
-    testValue === null ? "No loan/list price provided — market support not assessed." : null,
   ].filter((x): x is string => x !== null);
 
   return {
@@ -204,6 +241,10 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     ratingLine: RATING_LINE[rating],
     marketSupport,
     marketSupportLine,
+    hasTestValue: testValue !== null,
+    saleability: sale.label,
+    saleabilityLine: sale.line,
+    suggestedListPrice,
     conditionStatus: "Pending field inspection",
     fraudStatus: "Pending document review",
     flags,

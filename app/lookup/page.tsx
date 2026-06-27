@@ -197,13 +197,22 @@ export default function LookupPage() {
                 <p className="ml-4 max-w-[55%] text-right text-[11px] leading-snug opacity-95">{report.ratingLine}</p>
               </div>
               <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-5">
-                {[
-                  ["Market support", report.marketSupport.replace("_", " ")],
-                  ["Condition", "Pending"],
-                  ["Fraud signal", "Pending"],
-                  ["Absorption", intel.absorption.level],
-                  ["Red flags", `${report.criticalCount}C · ${report.advisoryCount}A`],
-                ].map(([label, value]) => (
+                {(report.hasTestValue
+                  ? ([
+                      ["Market support", report.marketSupport.replace("_", " ")],
+                      ["Saleability", report.saleability],
+                      ["Absorption", intel.absorption.level],
+                      ["Condition", "Field"],
+                      ["Red flags", `${report.criticalCount}C · ${report.advisoryCount}A`],
+                    ] as [string, string][])
+                  : ([
+                      ["Saleability", report.saleability],
+                      ["Suggested list", usd(report.suggestedListPrice)],
+                      ["Absorption", intel.absorption.level],
+                      ["Condition", "Field"],
+                      ["Red flags", `${report.criticalCount}C · ${report.advisoryCount}A`],
+                    ] as [string, string][])
+                ).map(([label, value]) => (
                   <div key={label} className="bg-white px-3 py-2 text-center">
                     <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">{label}</p>
                     <p className="mt-0.5 text-xs font-bold text-pi-navy">{value}</p>

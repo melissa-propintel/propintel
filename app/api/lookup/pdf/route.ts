@@ -217,14 +217,22 @@ export async function POST(req: NextRequest) {
   }
   ctx.y = bTop - 54;
 
-  // Grades row
-  const grades: [string, string][] = [
-    ["MARKET SUPPORT", report.marketSupport.replace("_", " ")],
-    ["CONDITION", "Pending"],
-    ["FRAUD SIGNAL", "Pending"],
-    ["ABSORPTION", intel.absorption.level],
-    ["RED FLAGS", `${report.criticalCount}C · ${report.advisoryCount}A`],
-  ];
+  // Grades row — value-first when there's no loan/list price to test.
+  const grades: [string, string][] = report.hasTestValue
+    ? [
+        ["MARKET SUPPORT", report.marketSupport.replace("_", " ")],
+        ["SALEABILITY", report.saleability],
+        ["CONDITION", "Field"],
+        ["ABSORPTION", intel.absorption.level],
+        ["RED FLAGS", `${report.criticalCount}C · ${report.advisoryCount}A`],
+      ]
+    : [
+        ["SALEABILITY", report.saleability],
+        ["SUGGESTED LIST", usd(report.suggestedListPrice)],
+        ["CONDITION", "Field"],
+        ["ABSORPTION", intel.absorption.level],
+        ["RED FLAGS", `${report.criticalCount}C · ${report.advisoryCount}A`],
+      ];
   ensure(ctx, 34);
   const cellW = CONTENT_W / grades.length;
   const gTop = ctx.y;
@@ -308,7 +316,42 @@ export async function POST(req: NextRequest) {
   }
 
   text(ctx, "VALUE BASIS", { size: 9, font: bold, color: NAVY, gap: 2 });
-  text(ctx, `${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}. ${intel.valueRange.basis}`, { size: 9, gap: 8 });
+  text(ctx, `${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}. ${intel.valueRange.basis}`, { size: 9 });
+  if (report.suggestedListPrice) {
+    text(ctx, `Suggested list price to sell in a normal window: ${usd(report.suggestedListPrice)} (${report.saleabilityLine})`, { size: 9, gap: 8 });
+  } else {
+    ctx.y -= 6;
+  }
+
+  // ===================== COMPARABLES — the comps the value is built on =====================
+  const solds = intel.comps.filter((c) => c.status === "sold");
+  const actives = intel.comps.filter((c) => c.status === "active");
+  const compRow = (c: { address: string; price: number | null; distanceMiles: number; beds: number | null; baths: number | null; sqft: number | null; pricePerSqft: number | null; daysOnMarket: number | null; soldDate: string | null }, header: () => void) => {
+    if (ctx.y - 11 < FOOT_Y + 36) { newPage(ctx, true); header(); }
+    const addr = c.address.length > 30 ? c.address.slice(0, 29) + "…" : c.address;
+    ctx.page.drawText(addr, { x: MARGIN, y: ctx.y - 8, size: 7.5, font, color: SLATE });
+    ctx.page.drawText(usd(c.price), { x: MARGIN + 175, y: ctx.y - 8, size: 7.5, font, color: SLATE });
+    ctx.page.drawText(`${c.beds ?? "—"}/${c.baths ?? "—"}`, { x: MARGIN + 235, y: ctx.y - 8, size: 7.5, font, color: SLATE });
+    ctx.page.drawText(c.sqft ? c.sqft.toLocaleString() : "—", { x: MARGIN + 280, y: ctx.y - 8, size: 7.5, font, color: SLATE });
+    ctx.page.drawText(c.pricePerSqft ? "$" + c.pricePerSqft : "—", { x: MARGIN + 335, y: ctx.y - 8, size: 7.5, font, color: SLATE });
+    ctx.page.drawText(`${c.distanceMiles}mi`, { x: MARGIN + 385, y: ctx.y - 8, size: 7.5, font, color: SLATE });
+    ctx.page.drawText(c.daysOnMarket != null ? String(c.daysOnMarket) : "—", { x: MARGIN + 435, y: ctx.y - 8, size: 7.5, font, color: SLATE });
+    ctx.y -= 11;
+  };
+  const compHeader = () => {
+    if (ctx.y - 12 < FOOT_Y + 36) newPage(ctx, true);
+    const h: [number, string][] = [[0, "ADDRESS"], [175, "PRICE"], [235, "BD/BA"], [280, "SQFT"], [335, "$/SF"], [385, "DIST"], [435, "DOM"]];
+    for (const [x, s] of h) ctx.page.drawText(s, { x: MARGIN + x, y: ctx.y - 8, size: 6, font: bold, color: LIGHT });
+    ctx.y -= 12;
+  };
+
+  text(ctx, `SOLD COMPARABLES (${solds.length})`, { size: 9, font: bold, color: NAVY, gap: 3 });
+  if (solds.length) { compHeader(); for (const c of solds) compRow(c, compHeader); ctx.y -= 6; }
+  else text(ctx, "No sold comps in the window.", { size: 8, color: LIGHT, gap: 6 });
+
+  text(ctx, `ACTIVE LISTINGS (${actives.length})`, { size: 9, font: bold, color: NAVY, gap: 3 });
+  if (actives.length) { compHeader(); for (const c of actives) compRow(c, compHeader); ctx.y -= 6; }
+  else text(ctx, "No active listings in the window.", { size: 8, color: LIGHT, gap: 6 });
 
   text(ctx, "THREE LENSES", { size: 9, font: bold, color: NAVY, gap: 3 });
   for (const l of intel.lenses) {
