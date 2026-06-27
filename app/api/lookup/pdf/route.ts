@@ -204,12 +204,15 @@ export async function POST(req: NextRequest) {
   text(ctx, s.address, { size: 15, font: bold, color: NAVY });
   text(ctx, [s.city, s.state, s.zip].filter(Boolean).join(", "), { size: 8, color: SLATE, gap: report.mlsRequired ? 6 : 8 });
 
-  // PRELIMINARY banner — thin/rural data that can't support a defensible value alone.
+  // Data-confidence banner — thin/rural or no-record data that needs agent comps.
   if (report.mlsRequired) {
+    const isLow = report.confidenceLevel === "LOW";
     ensure(ctx, 40);
     const pTop = ctx.y;
-    ctx.page.drawRectangle({ x: MARGIN, y: pTop - 36, width: CONTENT_W, height: 36, color: rgb(0.99, 0.93, 0.86), borderColor: rgb(0.71, 0.43, 0.04), borderWidth: 1 });
-    ctx.page.drawText("PRELIMINARY — AGENT COMPS / MLS REQUIRED", { x: MARGIN + 8, y: pTop - 13, size: 8.5, font: bold, color: rgb(0.55, 0.32, 0.02) });
+    const bg = isLow ? rgb(0.99, 0.9, 0.9) : rgb(0.99, 0.93, 0.86);
+    const bd = isLow ? RED : rgb(0.71, 0.43, 0.04);
+    ctx.page.drawRectangle({ x: MARGIN, y: pTop - 36, width: CONTENT_W, height: 36, color: bg, borderColor: bd, borderWidth: 1 });
+    ctx.page.drawText(isLow ? "PRELIMINARY — AGENT COMPS / MLS REQUIRED" : "VERIFY — SUBJECT UNCONFIRMED · AGENT COMPS RECOMMENDED", { x: MARGIN + 8, y: pTop - 13, size: 8.5, font: bold, color: bd });
     for (const [i, l] of wrap(report.confidenceReasons[0] ?? report.confidenceLine, font, 7.5, CONTENT_W - 16).slice(0, 2).entries()) {
       ctx.page.drawText(l, { x: MARGIN + 8, y: pTop - 24 - i * 9, size: 7.5, font, color: SLATE });
     }

@@ -435,10 +435,10 @@ export function scoreConfidence(
     reasons.push(`Only ${soldHouses} usable sold house comp${soldHouses === 1 ? "" : "s"} — too few to support a defensible value.`);
   } else if (!sizeKnown && (soldHouses < 8 || radius > 1.2)) {
     level = "LOW";
-    reasons.push("No public property record (size/beds unknown), so the value can't be normalized to the subject; comp set is thin or reaches wide. Rural/limited-data property.");
+    reasons.push("No public property record (size/beds unknown) and a thin/wide comp set — value can't be normalized to the subject. Rural/limited-data property.");
   } else if (!sizeKnown || soldHouses < 6 || radius > 1.5 || (disp !== null && disp > 2.2)) {
     level = "MODERATE";
-    if (!sizeKnown) reasons.push("No property record for the subject — value not size-normalized.");
+    if (!sizeKnown) reasons.push("No public property record for the subject (size/beds unknown) — the range is directional from area comps, not normalized to this home.");
     if (soldHouses < 6) reasons.push(`Thin sold comp set (${soldHouses}).`);
     if (radius > 1.5) reasons.push(`Comps reach ${radius} mi — local inventory is limited.`);
     if (disp !== null && disp > 2.2) reasons.push("Wide value spread between comps — condition will drive where it lands.");
@@ -447,13 +447,17 @@ export function scoreConfidence(
     reasons.push(`${soldHouses} size-relevant sold house comps within ${radius} mi — a defensible local data set.`);
   }
 
-  const mlsRequired = level === "LOW";
+  // Agent comps / MLS are required whenever we lack the subject's own record
+  // (size/beds unknown) or the comp set is too thin to value on its own.
+  const mlsRequired = !sizeKnown || soldHouses < 4;
   const line =
-    level === "HIGH"
-      ? "High confidence — the comp data supports a defensible value."
-      : level === "MODERATE"
-        ? "Moderate confidence — value is directional; field verification will tighten it."
-        : "Low confidence — PRELIMINARY. This property needs agent comps / MLS before relying on a value.";
+    level === "LOW"
+      ? "Low confidence — PRELIMINARY. This property needs agent comps / MLS before relying on a value."
+      : mlsRequired
+        ? "Verify — no public record for this property (size/beds unknown). The range is directional from area comps; confirm with agent comps / MLS."
+        : level === "MODERATE"
+          ? "Moderate confidence — value is directional; field verification will tighten it."
+          : "High confidence — the comp data supports a defensible value.";
 
   return { level, mlsRequired, line, reasons };
 }
