@@ -397,6 +397,7 @@ export function analyzeMarket(
     medianDom: medianDom !== null ? Math.round(medianDom) : null,
     lenses,
     comps: selected,
+    rent: null, // populated by the route from the data pull
     neighborhood: null, // populated by the route after the market analysis
     usingSampleData,
   };

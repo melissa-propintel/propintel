@@ -89,6 +89,7 @@ interface AcsResult {
   ownerOccupiedPct: number | null;
   medianHomeValue: number | null;
   medianHouseholdIncome: number | null;
+  population: number | null;
 }
 
 async function acs(t: Tract): Promise<AcsResult | null> {
@@ -96,7 +97,7 @@ async function acs(t: Tract): Promise<AcsResult | null> {
   // Without one we skip the census layer and the report flags it as not available.
   const key = process.env.CENSUS_API_KEY;
   if (!key) return null;
-  const vars = "B25002_001E,B25002_003E,B25003_001E,B25003_002E,B25077_001E,B19013_001E";
+  const vars = "B25002_001E,B25002_003E,B25003_001E,B25003_002E,B25077_001E,B19013_001E,B01003_001E";
   const url =
     `https://api.census.gov/data/2022/acs/acs5?get=${vars}` +
     `&for=tract:${t.tract}&in=state:${t.state}+county:${t.county}&key=${key}`;
@@ -117,6 +118,7 @@ async function acs(t: Tract): Promise<AcsResult | null> {
     ownerOccupiedPct: occTotal && owner !== null && occTotal > 0 ? round((owner / occTotal) * 100) : null,
     medianHomeValue: g("B25077_001E"),
     medianHouseholdIncome: g("B19013_001E"),
+    population: g("B01003_001E"),
   };
 }
 
@@ -136,6 +138,7 @@ export async function fetchNeighborhood(lat: number, lon: number): Promise<Neigh
     ownerOccupiedPct: acsData?.ownerOccupiedPct ?? null,
     medianHomeValue: acsData?.medianHomeValue ?? null,
     medianHouseholdIncome: acsData?.medianHouseholdIncome ?? null,
+    tractPopulation: acsData?.population ?? null,
     censusTract: tr?.full ?? null,
     sources,
   };
@@ -150,6 +153,7 @@ export function sampleNeighborhood(): NeighborhoodData {
     ownerOccupiedPct: 49,
     medianHomeValue: 96500,
     medianHouseholdIncome: 38200,
+    tractPopulation: 3850,
     censusTract: "39035104300",
     sources: ["Sample data"],
   };

@@ -13,7 +13,7 @@
 // comparable sales via the AVM /avm/value `comparables` array. Both map into the
 // same normalized Comp; the engine treats them identically downstream.
 
-import type { SubjectProperty, Comp, CompStatus } from "./market-data";
+import type { SubjectProperty, Comp, CompStatus, RentRead } from "./market-data";
 import { distanceMiles } from "./comp-engine";
 
 const BASE = "https://api.rentcast.io/v1";
@@ -156,9 +156,16 @@ function toComp(
   };
 }
 
+interface RawRent {
+  rent?: number;
+  rentRangeLow?: number;
+  rentRangeHigh?: number;
+}
+
 export interface MarketPull {
   subject: SubjectProperty;
   comps: Comp[];
+  rent: RentRead | null;
 }
 
 async function tryGet(path: string, params: Record<string, string | number>): Promise<unknown> {
@@ -241,5 +248,16 @@ export async function pullMarketData(address: string): Promise<MarketPull> {
     }
   }
 
-  return { subject, comps };
+  // 5. Long-term rent estimate (best-effort).
+  let rent: RentRead | null = null;
+  const rentRaw = (await tryGet("/avm/rent/long-term", { address, compCount: 20 })) as RawRent | null;
+  if (rentRaw) {
+    rent = {
+      estimate: num(rentRaw.rent),
+      low: num(rentRaw.rentRangeLow),
+      high: num(rentRaw.rentRangeHigh),
+    };
+  }
+
+  return { subject, comps, rent };
 }

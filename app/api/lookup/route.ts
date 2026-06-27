@@ -21,6 +21,7 @@ export async function POST(req: Request) {
   if (!hasRentcastKey()) {
     const intel = analyzeMarket(sampleSubject(), sampleComps(), true);
     intel.neighborhood = sampleNeighborhood();
+    intel.rent = { estimate: 1250, low: 1150, high: 1350 };
     return NextResponse.json({ intel });
   }
 
@@ -29,8 +30,9 @@ export async function POST(req: Request) {
   }
 
   try {
-    const { subject, comps } = await pullMarketData(address);
+    const { subject, comps, rent } = await pullMarketData(address);
     const intel = analyzeMarket(subject, comps, false);
+    intel.rent = rent;
     if (subject.latitude !== null && subject.longitude !== null) {
       try {
         intel.neighborhood = await fetchNeighborhood(subject.latitude, subject.longitude);

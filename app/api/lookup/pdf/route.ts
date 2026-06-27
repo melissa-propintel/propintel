@@ -27,13 +27,6 @@ const RATING_COLOR: Record<RiskRating, RGB> = {
   HIGH: rgb(0.76, 0.36, 0.04),
   CRITICAL: rgb(0.73, 0.11, 0.11),
 };
-const RATING_WORD: Record<RiskRating, string> = {
-  LOW: "LOW RISK",
-  MODERATE: "MODERATE RISK",
-  HIGH: "HIGH RISK",
-  CRITICAL: "CRITICAL — ESCALATE",
-};
-
 const PAGE_W = 612;
 const PAGE_H = 792;
 const MARGIN = 50;
@@ -211,12 +204,12 @@ export async function POST(req: NextRequest) {
   text(ctx, s.address, { size: 15, font: bold, color: NAVY });
   text(ctx, [s.city, s.state, s.zip].filter(Boolean).join(", "), { size: 8, color: SLATE, gap: 8 });
 
-  // Rating banner
+  // Rating banner — letter grade + descriptor (v1.1)
   ensure(ctx, 46);
   const bTop = ctx.y;
   ctx.page.drawRectangle({ x: MARGIN, y: bTop - 44, width: CONTENT_W, height: 44, color: RATING_COLOR[report.rating] });
-  ctx.page.drawText("OVERALL ASSESSMENT", { x: MARGIN + 10, y: bTop - 14, size: 7, font: bold, color: rgb(1, 1, 1) });
-  ctx.page.drawText(RATING_WORD[report.rating], { x: MARGIN + 10, y: bTop - 33, size: 17, font: bold, color: WHITE });
+  ctx.page.drawText("OVERALL RISK", { x: MARGIN + 10, y: bTop - 14, size: 7, font: bold, color: rgb(1, 1, 1) });
+  ctx.page.drawText(`${report.gradeLetter} — ${report.gradeDescriptor}`, { x: MARGIN + 10, y: bTop - 33, size: 17, font: bold, color: WHITE });
   let ry = bTop - 13;
   for (const l of wrap(report.ratingLine, font, 7.5, 230).slice(0, 3)) {
     ctx.page.drawText(l, { x: PAGE_W - MARGIN - 240, y: ry, size: 7.5, font, color: rgb(0.95, 0.97, 1) });
@@ -270,6 +263,35 @@ export async function POST(req: NextRequest) {
   for (const l of wrap(intel.absorption.ratioLine, font, 6, halfW - 16).slice(0, 1)) ctx.page.drawText(l, { x: ax + 8, y: vTop - 41, size: 6, font, color: SLATE });
   ctx.y = vTop - 56;
 
+  // REAL MARKET callout (v1.1 page-1 differentiator)
+  ensure(ctx, 30);
+  const rmTop = ctx.y;
+  ctx.page.drawRectangle({ x: MARGIN, y: rmTop - 28, width: CONTENT_W, height: 28, color: rgb(0.93, 0.96, 0.94), borderColor: GREEN, borderWidth: 0.75 });
+  ctx.page.drawText(`REAL MARKET: ${report.marketStrength.toUpperCase()}`, { x: MARGIN + 8, y: rmTop - 12, size: 8, font: bold, color: rgb(0.07, 0.4, 0.3) });
+  for (const l of wrap(report.realMarketLine, font, 7.5, CONTENT_W - 16).slice(0, 1)) {
+    ctx.page.drawText(l, { x: MARGIN + 8, y: rmTop - 23, size: 7.5, font, color: SLATE });
+  }
+  ctx.y = rmTop - 38;
+
+  // KEY NUMBERS — dense two-column block
+  text(ctx, "KEY NUMBERS", { size: 9, font: bold, color: NAVY, gap: 3 });
+  {
+    const colGap = 12;
+    const colW2 = (CONTENT_W - colGap) / 2;
+    const rows = Math.ceil(report.keyNumbers.length / 2);
+    const kTop = ctx.y;
+    report.keyNumbers.forEach((f, i) => {
+      const col = Math.floor(i / rows);
+      const rowi = i % rows;
+      const x = MARGIN + col * (colW2 + colGap);
+      const yy = kTop - rowi * 12 - 8;
+      ctx.page.drawText(f.label, { x, y: yy, size: 7.5, font, color: LIGHT });
+      const val = f.value.length > 34 ? f.value.slice(0, 33) + "…" : f.value;
+      ctx.page.drawText(val, { x: x + colW2 - bold.widthOfTextAtSize(val, 7.5), y: yy, size: 7.5, font: bold, color: SLATE });
+    });
+    ctx.y = kTop - rows * 12 - 8;
+  }
+
   // Red flags
   text(ctx, `RED FLAGS — ${report.criticalCount} critical · ${report.advisoryCount} advisory`, { size: 10, font: bold, color: NAVY, gap: 3 });
   if (report.flags.length === 0) {
@@ -292,12 +314,18 @@ export async function POST(req: NextRequest) {
   ctx.y -= 2;
   text(ctx, report.marketSupportLine, { size: 8, color: LIGHT });
 
-  // ===================== PAGE 2 — MARKET REALITY =====================
+  // ===================== PAGE 2 — REAL MARKET (§2) =====================
   newPage(ctx, true);
-  sectionTitle(ctx, "Market Reality");
+  sectionTitle(ctx, "Real Market");
+  text(ctx, `${report.marketStrength} market.`, { size: 11, font: bold, color: NAVY, gap: 1 });
+  text(ctx, report.realMarketLine, { size: 9, gap: 5 });
+  text(ctx, "BUYER POOL", { size: 8, font: bold, color: LIGHT, gap: 1 });
+  text(ctx, report.buyerPool, { size: 9, gap: 5 });
+  text(ctx, "HALF-MILE RADIUS", { size: 8, font: bold, color: LIGHT, gap: 1 });
+  text(ctx, report.halfMileStory, { size: 9, gap: 6 });
+  text(ctx, "ABSORPTION", { size: 8, font: bold, color: LIGHT, gap: 1 });
   text(ctx, intel.absorption.headline, { size: 10, font: bold, color: NAVY, gap: 2 });
-  text(ctx, intel.absorption.ratioLine, { size: 9, gap: 4 });
-  text(ctx, intel.ring.note, { size: 9 });
+  text(ctx, intel.absorption.ratioLine, { size: 9 });
   text(
     ctx,
     `${intel.ring.activeCount} active · ${intel.ring.pendingCount} pending · ${intel.ring.soldCount} sold in ${intel.ring.windowMonths} mo · radius ${intel.ring.radiusReachedMiles} mi${
@@ -322,12 +350,28 @@ export async function POST(req: NextRequest) {
     ctx.y -= 8;
   }
 
-  text(ctx, "VALUE BASIS", { size: 9, font: bold, color: NAVY, gap: 2 });
-  text(ctx, `${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}. ${intel.valueRange.basis}`, { size: 9 });
+  // ===================== MARKET INTELLIGENCE (§5) =====================
+  newPage(ctx, true);
+  sectionTitle(ctx, "Market Intelligence");
+  text(ctx, "VALUE & METHODOLOGY", { size: 9, font: bold, color: NAVY, gap: 2 });
+  text(ctx, `Indicated as-is value range: ${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}.`, { size: 10, font: bold, color: NAVY, gap: 1 });
+  text(ctx, report.valueMethodology, { size: 9, gap: 2 });
   if (report.suggestedListPrice) {
-    text(ctx, `Suggested list price to sell in a normal window: ${usd(report.suggestedListPrice)} (${report.saleabilityLine})`, { size: 9, gap: 8 });
+    text(ctx, `Suggested list price (normal window): ${usd(report.suggestedListPrice)} — ${report.saleabilityLine}`, { size: 9, gap: 6 });
   } else {
-    ctx.y -= 6;
+    ctx.y -= 4;
+  }
+
+  // Rent analysis (v1.1 KEY NUMBERS requirement)
+  text(ctx, "RENT ANALYSIS", { size: 9, font: bold, color: NAVY, gap: 2 });
+  if (intel.rent && (intel.rent.estimate || intel.rent.low || intel.rent.high)) {
+    const r = intel.rent;
+    text(ctx, `Supportable long-term rent: ${usd(r.low ?? r.estimate)} – ${usd(r.high ?? r.estimate)} / month${r.estimate ? ` (estimate ${usd(r.estimate)})` : ""}.`, { size: 9, gap: 1 });
+    const grm = r.estimate && intel.valueRange.high ? (intel.valueRange.high / (r.estimate * 12)).toFixed(1) : null;
+    if (grm) text(ctx, `Gross rent multiplier ~${grm}x at the high end of value — a quick yield check for investor buyers.`, { size: 8, color: LIGHT, gap: 6 });
+    else ctx.y -= 4;
+  } else {
+    text(ctx, "Rent estimate not available for this property.", { size: 8, color: LIGHT, gap: 6 });
   }
 
   // ===================== COMPARABLES — the comps the value is built on =====================
@@ -366,9 +410,11 @@ export async function POST(req: NextRequest) {
     text(ctx, l.takeaway, { size: 9, indent: 4, gap: 5 });
   }
 
-  // ===================== PAGE 3 — PROPERTY & NEIGHBORHOOD =====================
+  // ===================== TAX RECORD vs REALITY (§3) + PROPERTY + CONDITION =====================
   newPage(ctx, true);
-  sectionTitle(ctx, "Property & Neighborhood");
+  sectionTitle(ctx, "Tax Record vs. Reality");
+  for (const t of report.taxVsReality) text(ctx, t, { size: 9, gap: 3 });
+  ctx.y -= 2;
 
   text(ctx, "PROPERTY", { size: 9, font: bold, color: NAVY, gap: 3 });
   for (const f of report.propertyFacts) {
@@ -408,17 +454,33 @@ export async function POST(req: NextRequest) {
     text(ctx, REQUIRED_SHOTS.map((sh) => sh.label).join(" · ") + " · plus any damaged surrounding homes.", { size: 8, indent: 4, color: LIGHT, gap: 8 });
   }
 
-  text(ctx, "NEIGHBORHOOD", { size: 9, font: bold, color: NAVY, gap: 3 });
-  for (const f of report.neighborhood) {
+  // ===================== COMMUNITY TRUTH (§8) =====================
+  newPage(ctx, true);
+  sectionTitle(ctx, "Community Truth");
+  text(ctx, "What a BPO won't tell you about this submarket — sourced from public data, stated factually.", { size: 8, color: LIGHT, gap: 4 });
+  text(ctx, "SUBMARKET CHARACTER", { size: 9, font: bold, color: NAVY, gap: 1 });
+  text(ctx, report.communityCharacter, { size: 9, gap: 5 });
+  text(ctx, "ECONOMICS & DEMOGRAPHICS", { size: 9, font: bold, color: NAVY, gap: 3 });
+  for (const f of report.communityEconomics) {
     ensure(ctx, 12);
     ctx.page.drawText(f.label, { x: MARGIN, y: ctx.y - 8, size: 8.5, font, color: LIGHT });
-    ctx.page.drawText(f.value, { x: MARGIN + 160, y: ctx.y - 8, size: 8.5, font: bold, color: SLATE });
-    ctx.y -= 12;
+    for (const [i, l] of wrap(f.value, font, 8.5, CONTENT_W - 175).entries()) {
+      if (i > 0) ensure(ctx, 11);
+      ctx.page.drawText(l, { x: MARGIN + 175, y: ctx.y - 8, size: 8.5, font: bold, color: SLATE });
+      ctx.y -= 11;
+    }
   }
-  ctx.y -= 6;
+  ctx.y -= 4;
+  text(ctx, "WHAT IT MEANS", { size: 9, font: bold, color: NAVY, gap: 1 });
+  text(ctx, report.communityImplications, { size: 9, gap: 6 });
 
-  text(ctx, "PENDING / DATA NOTES", { size: 9, font: bold, color: NAVY, gap: 2 });
-  for (const n of report.pendingNotes) text(ctx, `• ${n}`, { size: 8, indent: 4, color: LIGHT, gap: 1 });
+  // ===================== SUMMARY & NEXT STEPS (§9) =====================
+  newPage(ctx, true);
+  sectionTitle(ctx, "Summary & Next Steps");
+  for (const sline of report.summary) text(ctx, sline, { size: 9.5, gap: 4 });
+  ctx.y -= 4;
+  text(ctx, "DATA NOTES", { size: 9, font: bold, color: NAVY, gap: 2 });
+  for (const n of report.pendingNotes) text(ctx, `- ${n}`, { size: 8, indent: 4, color: LIGHT, gap: 1 });
 
   // ===================== FIELD PHOTOS (from the order's folder) =====================
   {

@@ -116,8 +116,15 @@ export interface NeighborhoodData {
   ownerOccupiedPct: number | null;
   medianHomeValue: number | null;
   medianHouseholdIncome: number | null;
+  tractPopulation: number | null;
   censusTract: string | null;
   sources: string[];
+}
+
+export interface RentRead {
+  estimate: number | null;
+  low: number | null;
+  high: number | null;
 }
 
 export interface MarketIntel {
@@ -131,6 +138,8 @@ export interface MarketIntel {
   medianDom: number | null;
   lenses: LensTake[];
   comps: Comp[];
+  /** Long-term rent estimate + range (Rentcast). Null until fetched. */
+  rent: RentRead | null;
   /** Auto-pulled neighborhood data (FEMA + Census). Null until fetched. */
   neighborhood: NeighborhoodData | null;
   /** True when the result came from built-in sample data (no API key). */
