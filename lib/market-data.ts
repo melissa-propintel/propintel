@@ -43,6 +43,7 @@ export interface Comp {
   baths: number | null;
   sqft: number | null;
   pricePerSqft: number | null;
+  propertyType: string | null;
 }
 
 // ---- analysis result ----
@@ -101,6 +102,15 @@ export interface ValueRange {
   perSqftLow: number | null;
   perSqftHigh: number | null;
   basis: string;
+  /** Distressed / as-is comp tier (lower $/sqft). */
+  asIsLow: number | null;
+  asIsHigh: number | null;
+  /** Renovated / retail comp tier (upper $/sqft). */
+  renovatedLow: number | null;
+  renovatedHigh: number | null;
+  /** Count of house comps used after filtering land/lots/outliers. */
+  compsUsed: number;
+  excludedCount: number;
 }
 
 export interface LensTake {

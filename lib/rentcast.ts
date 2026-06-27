@@ -153,6 +153,7 @@ function toComp(
     baths: num(rec.bathrooms),
     sqft,
     pricePerSqft: price !== null && sqft !== null && sqft > 0 ? Math.round(price / sqft) : null,
+    propertyType: str(rec.propertyType),
   };
 }
 

@@ -61,6 +61,7 @@ export function sampleComps(): Comp[] {
       baths: 1,
       sqft,
       pricePerSqft,
+      propertyType: "Single Family",
     });
   };
 

@@ -260,38 +260,79 @@ export function buildPriceBands(selected: Comp[]): PriceBand[] {
  * appraiser-style per-sqft on size-matched comps — so heterogeneous markets
  * don't blow the range out. A range, never a single number.
  */
+/** A comp is house-like (not vacant land / a lot / an acreage parcel). */
+export function isHouseComp(c: Comp): boolean {
+  const pt = (c.propertyType ?? "").toLowerCase();
+  if (pt.includes("land") || pt.includes("lot") || pt.includes("vacant")) return false;
+  const addr = c.address.toLowerCase();
+  if (/\blot\b|\bacre|\bparcel\b/.test(addr)) return false; // "White St, Lot 0", "3.02 Acres Hwy"
+  // Needs a house signal — beds or a real floor area.
+  if ((c.beds === null || c.beds < 1) && (c.sqft === null || c.sqft < 400)) return false;
+  return true;
+}
+
+/** Drop extreme price outliers (lots/mansions/acreage that slipped through). */
+function rejectOutliers(comps: Comp[]): { kept: Comp[]; dropped: number } {
+  const prices = comps.map((c) => c.price as number).filter((p) => Number.isFinite(p)).sort((a, b) => a - b);
+  if (prices.length < 6) return { kept: comps, dropped: 0 };
+  const q1 = percentile(prices, 0.25) as number;
+  const q3 = percentile(prices, 0.75) as number;
+  const med = percentile(prices, 0.5) as number;
+  const iqr = q3 - q1;
+  const lo = Math.max(q1 - 1.5 * iqr, med * 0.3); // Tukey fence + a hard 0.3x–3.5x band vs median
+  const hi = Math.min(q3 + 1.5 * iqr, med * 3.5);
+  const kept = comps.filter((c) => (c.price as number) >= lo && (c.price as number) <= hi);
+  return { kept: kept.length >= 3 ? kept : comps, dropped: comps.length - (kept.length >= 3 ? kept.length : comps.length) };
+}
+
+function rangeOf(values: number[], round = 1000): { low: number; high: number } | null {
+  if (values.length === 0) return null;
+  const low = percentile(values, 0.25) as number;
+  const high = percentile(values, 0.75) as number;
+  return { low: Math.round(low / round) * round, high: Math.round(high / round) * round };
+}
+
 export function computeValueRange(
   subject: SubjectProperty,
   selected: Comp[],
 ): ValueRange {
-  const solds = selected.filter((c) => c.status === "sold" && c.price !== null);
-  if (solds.length === 0) {
-    return {
-      low: null,
-      high: null,
-      perSqftLow: null,
-      perSqftHigh: null,
-      basis: "No sold comps in the window — value range not yet supportable.",
-    };
-  }
+  const empty = (basis: string): ValueRange => ({
+    low: null, high: null, perSqftLow: null, perSqftHigh: null, basis,
+    asIsLow: null, asIsHigh: null, renovatedLow: null, renovatedHigh: null, compsUsed: 0, excludedCount: 0,
+  });
 
-  // Prefer sold comps within ±30% of the subject's size for the value range.
-  let pool = solds;
+  const allSolds = selected.filter((c) => c.status === "sold" && c.price !== null && (c.price as number) > 5000);
+  if (allSolds.length === 0) return empty("No sold comps in the window — value range not yet supportable.");
+
+  // 1. House-only (drop land / lots / acreage), then reject price outliers.
+  const houseSolds = allSolds.filter(isHouseComp);
+  const basePool = houseSolds.length >= 3 ? houseSolds : allSolds;
+  const { kept: pool0, dropped } = rejectOutliers(basePool);
+  const excludedCount = allSolds.length - pool0.length;
+
+  // 2. Size-match to the subject when we know its size.
+  let pool = pool0;
   let sizeMatched = false;
   if (subject.sqft && subject.sqft > 0) {
     const lo = subject.sqft * 0.7;
     const hi = subject.sqft * 1.3;
-    const similar = solds.filter((c) => c.sqft !== null && c.sqft >= lo && c.sqft <= hi);
-    if (similar.length >= 4) {
-      pool = similar;
-      sizeMatched = true;
-    }
+    const similar = pool0.filter((c) => c.sqft !== null && c.sqft >= lo && c.sqft <= hi);
+    if (similar.length >= 4) { pool = similar; sizeMatched = true; }
   }
 
-  // Per-sqft method (preferred when we know the subject's size).
-  const perSqfts = pool
-    .map((c) => c.pricePerSqft)
-    .filter((x): x is number => x !== null && Number.isFinite(x));
+  // 3. As-is vs renovated tiers — split the pool by $/sqft (proxy for condition).
+  let asIs: { low: number; high: number } | null = null;
+  let renovated: { low: number; high: number } | null = null;
+  const withPsf = pool.filter((c) => c.pricePerSqft !== null).sort((a, b) => (a.pricePerSqft as number) - (b.pricePerSqft as number));
+  if (withPsf.length >= 4) {
+    const mid = Math.floor(withPsf.length / 2);
+    asIs = rangeOf(withPsf.slice(0, mid).map((c) => c.price as number));
+    renovated = rangeOf(withPsf.slice(mid).map((c) => c.price as number));
+  }
+
+  // 4. Headline range — per-sqft applied to subject size when known, else IQR of prices.
+  const perSqfts = pool.map((c) => c.pricePerSqft).filter((x): x is number => x !== null && Number.isFinite(x));
+  const exclNote = excludedCount > 0 ? ` (${excludedCount} land/outlier comp${excludedCount === 1 ? "" : "s"} excluded)` : "";
   if (subject.sqft && subject.sqft > 0 && perSqfts.length >= 4) {
     const psLow = percentile(perSqfts, 0.25) as number;
     const psHigh = percentile(perSqfts, 0.75) as number;
@@ -300,11 +341,13 @@ export function computeValueRange(
       high: Math.round((psHigh * subject.sqft) / 1000) * 1000,
       perSqftLow: Math.round(psLow),
       perSqftHigh: Math.round(psHigh),
-      basis: `$${Math.round(psLow)}–$${Math.round(psHigh)}/sqft from ${pool.length} ${sizeMatched ? "size-matched " : ""}sold comps applied to ${subject.sqft.toLocaleString()} sqft.`,
+      basis: `$${Math.round(psLow)}–$${Math.round(psHigh)}/sqft from ${pool.length} ${sizeMatched ? "size-matched " : ""}house comps applied to ${subject.sqft.toLocaleString()} sqft${exclNote}.`,
+      asIsLow: asIs?.low ?? null, asIsHigh: asIs?.high ?? null,
+      renovatedLow: renovated?.low ?? null, renovatedHigh: renovated?.high ?? null,
+      compsUsed: pool.length, excludedCount,
     };
   }
 
-  // Fallback: interquartile range of sold prices.
   const prices = pool.map((c) => c.price as number);
   const pLow = percentile(prices, 0.25);
   const pHigh = percentile(prices, 0.75);
@@ -313,7 +356,10 @@ export function computeValueRange(
     high: pHigh !== null ? Math.round(pHigh / 1000) * 1000 : null,
     perSqftLow: null,
     perSqftHigh: null,
-    basis: `Interquartile range of ${pool.length} ${sizeMatched ? "size-matched " : ""}sold comp${pool.length === 1 ? "" : "s"}.`,
+    basis: `Interquartile range of ${pool.length} house comp${pool.length === 1 ? "" : "s"}${subject.sqft ? "" : " (subject size unknown — no per-sqft normalization)"}${exclNote}.`,
+    asIsLow: asIs?.low ?? null, asIsHigh: asIs?.high ?? null,
+    renovatedLow: renovated?.low ?? null, renovatedHigh: renovated?.high ?? null,
+    compsUsed: pool.length, excludedCount,
   };
 }
 
@@ -376,7 +422,11 @@ export function analyzeMarket(
   usingSampleData: boolean,
   windowMonths: number = DEFAULT_WINDOW_MONTHS,
 ): MarketIntel {
-  const { ring, selected } = buildRing(comps, windowMonths);
+  // Exclude vacant land / lots / acreage parcels — they aren't comps for a house,
+  // and they badly distort value in thin rural markets. Keep all if too few remain.
+  const houses = comps.filter(isHouseComp);
+  const compsForRing = houses.length >= 5 ? houses : comps;
+  const { ring, selected } = buildRing(compsForRing, windowMonths);
   const absorption = readAbsorption(selected, windowMonths);
   const priceBands = buildPriceBands(selected);
   const valueRange = computeValueRange(subject, selected);
