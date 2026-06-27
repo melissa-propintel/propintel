@@ -54,7 +54,9 @@ export async function POST(req: Request) {
   }
 
   const orderNumber = (body.orderNumber ?? "").trim();
-  const agentEmail = (body.agentEmail ?? "").trim();
+  // Accept a bare email or pull it out of a "Name <email>" string; strip brackets.
+  const raw = (body.agentEmail ?? "").trim();
+  const agentEmail = (raw.match(/[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+/)?.[0] ?? raw).replace(/[<>]/g, "");
   if (!orderNumber || !agentEmail) {
     return NextResponse.json({ error: "orderNumber and agentEmail are required." }, { status: 400 });
   }

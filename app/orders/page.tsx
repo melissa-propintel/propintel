@@ -116,7 +116,7 @@ export default function OrdersPage() {
     }
   }
 
-  const EMAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+  const EMAIL_RE = /[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+/;
 
   // When an agent email is set on a field order, auto-email them the link.
   async function assessCondition(o: Order) {
