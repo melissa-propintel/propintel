@@ -35,6 +35,7 @@ export default function OrdersPage() {
   const [loan, setLoan] = useState("");
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
+  const [sendMsg, setSendMsg] = useState<Record<string, string>>({});
 
   async function refresh() {
     if (!configured) {
@@ -105,6 +106,33 @@ export default function OrdersPage() {
       setTimeout(() => setCopied(null), 1500);
     } catch {
       /* ignore */
+    }
+  }
+
+  const EMAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
+
+  // When an agent email is set on a field order, auto-email them the link.
+  async function maybeEmailAgent(o: Order, value: string) {
+    const email = value.match(EMAIL_RE)?.[0];
+    if (!email || o.product_type !== "field") return;
+    setSendMsg((m) => ({ ...m, [o.id]: "Sending…" }));
+    try {
+      const res = await fetch("/api/agent-invite", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          orderNumber: o.order_number,
+          address: o.property_address,
+          agentEmail: email,
+          agentName: value.replace(EMAIL_RE, "").replace(/[<>]/g, "").trim() || undefined,
+        }),
+      });
+      const data = (await res.json()) as { sent?: boolean; notConfigured?: boolean; error?: string };
+      if (data.sent) setSendMsg((m) => ({ ...m, [o.id]: "Link emailed ✓" }));
+      else if (data.notConfigured) setSendMsg((m) => ({ ...m, [o.id]: "Email not set up — use Copy link" }));
+      else setSendMsg((m) => ({ ...m, [o.id]: data.error || "Send failed" }));
+    } catch {
+      setSendMsg((m) => ({ ...m, [o.id]: "Send failed — use Copy link" }));
     }
   }
 
@@ -188,14 +216,23 @@ export default function OrdersPage() {
                     </div>
                   </div>
                   {o.product_type === "field" && (
-                    <div className="mt-2 flex items-center gap-2">
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] uppercase tracking-wide text-slate-400">Agent</span>
                       <input
                         defaultValue={o.assigned_agent ?? ""}
-                        onBlur={(e) => patch(o, { assigned_agent: e.target.value.trim() || null, status: o.status === "new" && e.target.value.trim() ? "assigned" : o.status })}
-                        placeholder="agent name / email"
-                        className="flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs"
+                        onBlur={(e) => {
+                          const v = e.target.value.trim();
+                          patch(o, { assigned_agent: v || null, status: o.status === "new" && v ? "assigned" : o.status });
+                          if (v) void maybeEmailAgent({ ...o, assigned_agent: v }, v);
+                        }}
+                        placeholder="agent name + email (auto-sends the link)"
+                        className="min-w-[200px] flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs"
                       />
+                      {sendMsg[o.id] && (
+                        <span className={`text-[11px] ${sendMsg[o.id].includes("✓") ? "text-emerald-700" : "text-slate-500"}`}>
+                          {sendMsg[o.id]}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
