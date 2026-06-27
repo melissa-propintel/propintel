@@ -137,6 +137,16 @@ export interface RentRead {
   high: number | null;
 }
 
+export type ConfidenceLevel = "HIGH" | "MODERATE" | "LOW";
+
+export interface DataConfidence {
+  level: ConfidenceLevel;
+  /** True when the data can't support a defensible value alone — agent comps / MLS required. */
+  mlsRequired: boolean;
+  line: string; // one-line summary
+  reasons: string[];
+}
+
 export interface MarketIntel {
   subject: SubjectProperty;
   ring: CompRing;
@@ -148,6 +158,8 @@ export interface MarketIntel {
   medianDom: number | null;
   lenses: LensTake[];
   comps: Comp[];
+  /** Data confidence + whether agent comps/MLS are required for a defensible value. */
+  confidence: DataConfidence;
   /** Long-term rent estimate + range (Rentcast). Null until fetched. */
   rent: RentRead | null;
   /** Auto-pulled neighborhood data (FEMA + Census). Null until fetched. */

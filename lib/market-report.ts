@@ -29,6 +29,10 @@ export interface MarketReport {
   ratingLine: string;
   gradeLetter: "A" | "B" | "C" | "D" | "F"; // v1.1 letter grade
   gradeDescriptor: string;
+  confidenceLevel: "HIGH" | "MODERATE" | "LOW";
+  confidenceLine: string;
+  mlsRequired: boolean;
+  confidenceReasons: string[];
   marketSupport: MarketSupport;
   marketSupportLine: string;
   hasTestValue: boolean; // true only when a loan/list price was provided
@@ -403,6 +407,10 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     ratingLine: RATING_LINE[rating],
     gradeLetter,
     gradeDescriptor: GRADE_DESC[gradeLetter],
+    confidenceLevel: intel.confidence.level,
+    confidenceLine: intel.confidence.line,
+    mlsRequired: intel.confidence.mlsRequired,
+    confidenceReasons: intel.confidence.reasons,
     marketSupport,
     marketSupportLine,
     hasTestValue: testValue !== null,

@@ -186,6 +186,15 @@ export default function LookupPage() {
             </div>
           )}
 
+          {/* PRELIMINARY / MLS-required banner — shows the instant the address resolves */}
+          {report?.mlsRequired && (
+            <div className="rounded-lg border border-amber-400 bg-amber-50 p-3">
+              <p className="text-sm font-bold text-amber-800">⚠ Preliminary — agent comps / MLS required</p>
+              <p className="mt-0.5 text-xs text-amber-800">{report.confidenceReasons[0] ?? report.confidenceLine}</p>
+              <p className="mt-1 text-[11px] text-amber-700">Recommend a BPO or field order: the agent must upload comps + a price opinion before this value is reliable.</p>
+            </div>
+          )}
+
           {/* verdict */}
           {report && (
             <div className="overflow-hidden rounded-lg border border-pi-border bg-white">
@@ -194,7 +203,12 @@ export default function LookupPage() {
                   <p className="text-[10px] font-semibold uppercase tracking-wide opacity-80">Overall assessment</p>
                   <p className="text-xl font-black">{RATING_WORD[report.rating]}</p>
                 </div>
-                <p className="ml-4 max-w-[55%] text-right text-[11px] leading-snug opacity-95">{report.ratingLine}</p>
+                <div className="ml-4 max-w-[55%] text-right">
+                  <span className={`inline-block rounded px-1.5 py-0.5 text-[10px] font-bold ${report.confidenceLevel === "HIGH" ? "bg-emerald-500/30" : report.confidenceLevel === "MODERATE" ? "bg-amber-400/30" : "bg-red-500/40"}`}>
+                    {report.confidenceLevel} CONFIDENCE
+                  </span>
+                  <p className="mt-1 text-[11px] leading-snug opacity-95">{report.ratingLine}</p>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-px bg-slate-100 sm:grid-cols-5">
                 {(report.hasTestValue

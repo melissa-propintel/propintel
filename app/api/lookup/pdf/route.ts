@@ -202,7 +202,19 @@ export async function POST(req: NextRequest) {
   }  ·  Automated market read`;
   text(ctx, metaLine, { size: 8, color: LIGHT });
   text(ctx, s.address, { size: 15, font: bold, color: NAVY });
-  text(ctx, [s.city, s.state, s.zip].filter(Boolean).join(", "), { size: 8, color: SLATE, gap: 8 });
+  text(ctx, [s.city, s.state, s.zip].filter(Boolean).join(", "), { size: 8, color: SLATE, gap: report.mlsRequired ? 6 : 8 });
+
+  // PRELIMINARY banner — thin/rural data that can't support a defensible value alone.
+  if (report.mlsRequired) {
+    ensure(ctx, 40);
+    const pTop = ctx.y;
+    ctx.page.drawRectangle({ x: MARGIN, y: pTop - 36, width: CONTENT_W, height: 36, color: rgb(0.99, 0.93, 0.86), borderColor: rgb(0.71, 0.43, 0.04), borderWidth: 1 });
+    ctx.page.drawText("PRELIMINARY — AGENT COMPS / MLS REQUIRED", { x: MARGIN + 8, y: pTop - 13, size: 8.5, font: bold, color: rgb(0.55, 0.32, 0.02) });
+    for (const [i, l] of wrap(report.confidenceReasons[0] ?? report.confidenceLine, font, 7.5, CONTENT_W - 16).slice(0, 2).entries()) {
+      ctx.page.drawText(l, { x: MARGIN + 8, y: pTop - 24 - i * 9, size: 7.5, font, color: SLATE });
+    }
+    ctx.y = pTop - 44;
+  }
 
   // Rating banner — letter grade + descriptor (v1.1)
   ensure(ctx, 46);
@@ -252,7 +264,7 @@ export async function POST(req: NextRequest) {
   const halfW = (CONTENT_W - 10) / 2;
   const oversupplied = intel.absorption.level === "SEVERE" || intel.absorption.level === "OVERSUPPLIED";
   ctx.page.drawRectangle({ x: MARGIN, y: vTop - 46, width: halfW, height: 46, borderColor: rgb(0.85, 0.87, 0.9), borderWidth: 0.75 });
-  ctx.page.drawText("INDICATED AS-IS VALUE RANGE", { x: MARGIN + 8, y: vTop - 13, size: 6, font: bold, color: LIGHT });
+  ctx.page.drawText(report.mlsRequired ? "PRELIMINARY VALUE (UNVERIFIED)" : "INDICATED AS-IS VALUE RANGE", { x: MARGIN + 8, y: vTop - 13, size: 6, font: bold, color: report.mlsRequired ? rgb(0.55, 0.32, 0.02) : LIGHT });
   ctx.page.drawText(`${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}`, { x: MARGIN + 8, y: vTop - 31, size: 15, font: bold, color: NAVY });
   for (const l of wrap(intel.valueRange.basis, font, 6, halfW - 16).slice(0, 1)) ctx.page.drawText(l, { x: MARGIN + 8, y: vTop - 41, size: 6, font, color: LIGHT });
   const ax = MARGIN + halfW + 10;

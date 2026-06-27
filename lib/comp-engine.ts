@@ -18,6 +18,8 @@ import type {
   ValueRange,
   LensTake,
   MarketIntel,
+  DataConfidence,
+  ConfidenceLevel,
 } from "./market-data";
 
 const HALF_MILE = 0.5;
@@ -414,6 +416,48 @@ export function buildLenses(
   ];
 }
 
+// ---- data confidence: can we stand behind a value, or do we need agent comps/MLS? ----
+
+export function scoreConfidence(
+  subject: SubjectProperty,
+  ring: CompRing,
+  value: ValueRange,
+): DataConfidence {
+  const sizeKnown = !!(subject.sqft && subject.sqft > 0);
+  const soldHouses = value.compsUsed; // cleaned sold house pool used for value
+  const radius = ring.radiusReachedMiles;
+  const disp = value.low && value.high && value.low > 0 ? value.high / value.low : null;
+  const reasons: string[] = [];
+
+  let level: ConfidenceLevel;
+  if (soldHouses < 4) {
+    level = "LOW";
+    reasons.push(`Only ${soldHouses} usable sold house comp${soldHouses === 1 ? "" : "s"} — too few to support a defensible value.`);
+  } else if (!sizeKnown && (soldHouses < 8 || radius > 1.2)) {
+    level = "LOW";
+    reasons.push("No public property record (size/beds unknown), so the value can't be normalized to the subject; comp set is thin or reaches wide. Rural/limited-data property.");
+  } else if (!sizeKnown || soldHouses < 6 || radius > 1.5 || (disp !== null && disp > 2.2)) {
+    level = "MODERATE";
+    if (!sizeKnown) reasons.push("No property record for the subject — value not size-normalized.");
+    if (soldHouses < 6) reasons.push(`Thin sold comp set (${soldHouses}).`);
+    if (radius > 1.5) reasons.push(`Comps reach ${radius} mi — local inventory is limited.`);
+    if (disp !== null && disp > 2.2) reasons.push("Wide value spread between comps — condition will drive where it lands.");
+  } else {
+    level = "HIGH";
+    reasons.push(`${soldHouses} size-relevant sold house comps within ${radius} mi — a defensible local data set.`);
+  }
+
+  const mlsRequired = level === "LOW";
+  const line =
+    level === "HIGH"
+      ? "High confidence — the comp data supports a defensible value."
+      : level === "MODERATE"
+        ? "Moderate confidence — value is directional; field verification will tighten it."
+        : "Low confidence — PRELIMINARY. This property needs agent comps / MLS before relying on a value.";
+
+  return { level, mlsRequired, line, reasons };
+}
+
 // ---- orchestrator ----
 
 export function analyzeMarket(
@@ -447,6 +491,7 @@ export function analyzeMarket(
     medianDom: medianDom !== null ? Math.round(medianDom) : null,
     lenses,
     comps: selected,
+    confidence: scoreConfidence(subject, ring, valueRange),
     rent: null, // populated by the route from the data pull
     neighborhood: null, // populated by the route after the market analysis
     usingSampleData,
