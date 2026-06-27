@@ -315,7 +315,9 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
   // ---- KEY NUMBERS ----
   const rent = intel.rent;
   const keyNumbers: Fact[] = [
-    { label: "Indicated as-is value (range)", value: low !== null && high !== null ? `${usd(low)} – ${usd(high)}` : UNKNOWN },
+    { label: "Indicated value (blended)", value: low !== null && high !== null ? `${usd(low)} – ${usd(high)}` : UNKNOWN },
+    ...(value.asIsLow !== null ? [{ label: "As-is / distressed value", value: `${usd(value.asIsLow)} – ${usd(value.asIsHigh)}` }] : []),
+    ...(value.renovatedLow !== null ? [{ label: "Renovated / retail value", value: `${usd(value.renovatedLow)} – ${usd(value.renovatedHigh)}` }] : []),
     { label: "Suggested list price", value: usd(suggestedListPrice) },
     ...(testValue !== null ? [{ label: testLabel, value: usd(testValue) }] : []),
     { label: "Supportable rent (range)", value: rent && (rent.low || rent.high) ? `${usd(rent.low ?? rent.estimate)} – ${usd(rent.high ?? rent.estimate)} /mo` : UNKNOWN },
@@ -342,10 +344,14 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
   if (s.sqft) taxVsReality.push(`Public-record living area: ${s.sqft.toLocaleString()} sqft. Confirm against MLS on a field order — sqft discrepancies move the value.`);
 
   // ---- value methodology ----
+  const tierLine =
+    value.asIsLow !== null && value.renovatedLow !== null
+      ? ` Comps split by condition: distressed / as-is homes cluster at ${usd(value.asIsLow)}–${usd(value.asIsHigh)}, renovated / retail homes at ${usd(value.renovatedLow)}–${usd(value.renovatedHigh)}. A property in original condition belongs in the as-is tier; a rehabbed one in the retail tier.`
+      : "";
   const valueMethodology =
-    `Range built from sold comparables in the window — ${value.basis} ` +
-    `We read all comparables (not a hand-picked six), so the range reflects what the market actually supports, not a single opinion. ` +
-    `Where in the range a property lands is driven by condition and exact location.`;
+    `Range built from ${value.compsUsed} sold house comparables${value.excludedCount > 0 ? ` (${value.excludedCount} vacant-land / outlier comps excluded)` : ""} — ${value.basis} ` +
+    `We read all comparables (not a hand-picked six), so the range reflects what the market actually supports, not a single opinion.` +
+    tierLine;
 
   // ---- §8 Community Truth (minus crime, pending FBI CDE) ----
   const communityCharacter =
