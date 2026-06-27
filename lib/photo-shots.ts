@@ -1,26 +1,38 @@
-// The PropIntel field shot list. The required four are the core of every order;
-// damaged-surrounding-home and "other" shots are added on demand.
+// The PropIntel field shot list. Required shots must all be captured; rooms,
+// damage, and "other" are added as many times as needed.
+
+export type ShotGroup = "Exterior" | "Neighbors" | "Mechanicals" | "Interior" | "Other";
 
 export interface ShotDef {
   key: string;
   label: string;
   hint: string;
   required: boolean;
+  group: ShotGroup;
 }
 
 export const REQUIRED_SHOTS: ShotDef[] = [
-  { key: "subject-front", label: "Subject — front", hint: "Full front elevation of the property", required: true },
-  { key: "subject-address", label: "Subject — address / number", hint: "House number or address verification", required: false },
-  { key: "left-neighbor", label: "Neighbor — left", hint: "Home immediately to the left", required: true },
-  { key: "right-neighbor", label: "Neighbor — right", hint: "Home immediately to the right", required: true },
-  { key: "across-street", label: "Across the street", hint: "Home directly across from the subject", required: true },
+  // Exterior — front + all 4 sides + roof
+  { key: "front", label: "Front of house", hint: "Full front elevation", required: true, group: "Exterior" },
+  { key: "rear", label: "Rear of house", hint: "Full back of the house", required: true, group: "Exterior" },
+  { key: "left-side", label: "Left side", hint: "Left elevation", required: true, group: "Exterior" },
+  { key: "right-side", label: "Right side", hint: "Right elevation", required: true, group: "Exterior" },
+  { key: "roof", label: "Roof", hint: "From the ground — best view you can get", required: true, group: "Exterior" },
+  // Neighbors
+  { key: "left-neighbor", label: "Neighbor — left", hint: "Home immediately to the left", required: true, group: "Neighbors" },
+  { key: "right-neighbor", label: "Neighbor — right", hint: "Home immediately to the right", required: true, group: "Neighbors" },
+  { key: "across-street", label: "Across the street", hint: "Home directly across from the subject", required: true, group: "Neighbors" },
+  // Mechanicals
+  { key: "electrical-panel", label: "Electrical / breaker box", hint: "Open the panel door if you can", required: true, group: "Mechanicals" },
+  { key: "hvac", label: "HVAC unit", hint: "Outdoor condenser and/or furnace", required: true, group: "Mechanicals" },
+  { key: "water-heater", label: "Hot water heater", hint: "The water heater tank", required: true, group: "Mechanicals" },
 ];
 
-// Optional add-ons the agent can append as many times as needed.
-export const ADDON_SHOTS: { key: string; label: string; hint: string }[] = [
-  { key: "damaged", label: "Damaged surrounding home", hint: "Any nearby home that is damaged / distressed" },
-  { key: "street-view", label: "Street view", hint: "General view down the block" },
-  { key: "other", label: "Other", hint: "Anything else worth documenting" },
+// Repeatable add-ons — agent adds as many as needed.
+export const ADDON_SHOTS: { key: string; label: string; hint: string; group: ShotGroup }[] = [
+  { key: "room", label: "Interior room", hint: "If you have interior access — every room", group: "Interior" },
+  { key: "damage", label: "Damage", hint: "Any damage, inside or out", group: "Other" },
+  { key: "other", label: "Anything else", hint: "Anything you think we should see", group: "Other" },
 ];
 
 export const PHOTO_BUCKET = "field-photos";

@@ -45,6 +45,15 @@ export function generateOrderNumber(): string {
   return `PI-${yr}-${tail}`;
 }
 
+/** Fetch a single order by its order_number (used by the agent capture link). */
+export async function getOrderByNumber(orderNumber: string): Promise<Order | null> {
+  const s = getSupabase();
+  if (!s || !orderNumber) return null;
+  const { data, error } = await s.from("orders").select("*").eq("order_number", orderNumber).maybeSingle();
+  if (error) throw new Error(error.message);
+  return (data as Order) ?? null;
+}
+
 export async function listOrders(): Promise<Order[]> {
   const s = getSupabase();
   if (!s) return [];
