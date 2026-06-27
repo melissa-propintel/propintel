@@ -55,8 +55,8 @@ export function hasAnthropicKey(): boolean {
 
 export async function assessCondition(photos: OrderPhoto[]): Promise<ConditionAssessment> {
   const client = new Anthropic();
-  // Bound cost: at most 12 photos, prefer required exterior/mechanical shots.
-  const ordered = [...photos].sort((a, b) => rank(a.label) - rank(b.label)).slice(0, 12);
+  // Bound cost + latency: at most 8 photos, prefer required exterior/mechanical shots.
+  const ordered = [...photos].sort((a, b) => rank(a.label) - rank(b.label)).slice(0, 8);
 
   const content: Anthropic.ContentBlockParam[] = [];
   for (const p of ordered) {
@@ -76,7 +76,7 @@ export async function assessCondition(photos: OrderPhoto[]): Promise<ConditionAs
   });
 
   const res = await client.messages.create({
-    model: "claude-opus-4-8",
+    model: "claude-haiku-4-5",
     max_tokens: 1024,
     tools: [{ name: "record_condition", description: "Record the structured condition assessment.", input_schema: CONDITION_SCHEMA as unknown as Anthropic.Tool.InputSchema }],
     tool_choice: { type: "tool", name: "record_condition" },

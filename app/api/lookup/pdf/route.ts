@@ -8,8 +8,8 @@ import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, RGB } from "pdf-lib"
 import type { MarketIntel } from "@/lib/market-data";
 import { buildMarketReport, type RiskRating } from "@/lib/market-report";
 import { REQUIRED_SHOTS } from "@/lib/photo-shots";
-import { fetchOrderPhotos, fetchCondition, saveCondition } from "@/lib/order-photos";
-import { assessCondition, hasAnthropicKey, type ConditionAssessment } from "@/lib/condition";
+import { fetchOrderPhotos, fetchCondition } from "@/lib/order-photos";
+import type { ConditionAssessment } from "@/lib/condition";
 import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
@@ -179,21 +179,11 @@ export async function POST(req: NextRequest) {
   const s = intel.subject;
   const reportDate = meta.reportDate || new Date().toISOString().slice(0, 10);
 
-  // Field photos + AI condition (only when an order with photos exists). The
-  // condition assessment is cached per order, so it runs Claude once, not every PDF.
+  // Field photos + cached AI condition (only when an order with photos exists).
+  // The condition assessment is generated separately (/api/condition) and cached,
+  // so this PDF route stays fast and never blocks on an AI call.
   const orderPhotos = meta.orderNumber ? await fetchOrderPhotos(meta.orderNumber) : [];
-  let condition: ConditionAssessment | null = null;
-  if (meta.orderNumber && orderPhotos.length > 0) {
-    condition = await fetchCondition(meta.orderNumber);
-    if (!condition && hasAnthropicKey()) {
-      try {
-        condition = await assessCondition(orderPhotos);
-        await saveCondition(meta.orderNumber, condition);
-      } catch {
-        condition = null; // best-effort; report still renders
-      }
-    }
-  }
+  const condition: ConditionAssessment | null = meta.orderNumber ? await fetchCondition(meta.orderNumber) : null;
 
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);

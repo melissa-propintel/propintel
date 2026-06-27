@@ -37,6 +37,7 @@ export default function OrdersPage() {
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [sendMsg, setSendMsg] = useState<Record<string, string>>({});
+  const [condMsg, setCondMsg] = useState<Record<string, string>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
 
   async function refresh() {
@@ -116,6 +117,22 @@ export default function OrdersPage() {
   const EMAIL_RE = /[^\s@]+@[^\s@]+\.[^\s@]+/;
 
   // When an agent email is set on a field order, auto-email them the link.
+  async function assessCondition(o: Order) {
+    setCondMsg((m) => ({ ...m, [o.id]: "Reviewing photos…" }));
+    try {
+      const res = await fetch("/api/condition", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderNumber: o.order_number }),
+      });
+      const data = (await res.json()) as { condition?: { grade: string | null; gradeLabel: string }; error?: string };
+      if (data.condition) setCondMsg((m) => ({ ...m, [o.id]: `Condition: ${data.condition!.grade ?? "—"} — ${data.condition!.gradeLabel}` }));
+      else setCondMsg((m) => ({ ...m, [o.id]: data.error || "Assessment failed" }));
+    } catch (e) {
+      setCondMsg((m) => ({ ...m, [o.id]: e instanceof Error ? e.message : "Assessment failed" }));
+    }
+  }
+
   async function maybeEmailAgent(o: Order, value: string) {
     const email = value.match(EMAIL_RE)?.[0];
     if (!email || o.product_type !== "field") return;
@@ -269,6 +286,14 @@ export default function OrdersPage() {
                       {sendMsg[o.id] && (
                         <span className={`text-[11px] ${sendMsg[o.id].includes("✓") ? "text-emerald-700" : "text-slate-500"}`}>
                           {sendMsg[o.id]}
+                        </span>
+                      )}
+                      <button onClick={() => assessCondition(o)} className="text-[11px] text-pi-accent hover:underline">
+                        Assess condition from photos
+                      </button>
+                      {condMsg[o.id] && (
+                        <span className={`text-[11px] ${condMsg[o.id].startsWith("Condition:") ? "text-emerald-700" : "text-slate-500"}`}>
+                          {condMsg[o.id]}
                         </span>
                       )}
                     </div>
