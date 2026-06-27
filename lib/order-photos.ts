@@ -2,8 +2,9 @@
 // Supabase `field-photos/<order>` folder so the report can embed them.
 // Best-effort: returns [] when storage isn't configured or the folder is empty.
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { PHOTO_BUCKET } from "./photo-shots";
+import type { ConditionAssessment } from "./condition";
 
 export interface OrderPhoto {
   label: string;
@@ -17,13 +18,40 @@ function safeFolder(s: string): string {
   return (s.trim() || "unassigned").replace(/[^\w.-]+/g, "_").slice(0, 60);
 }
 
-export async function fetchOrderPhotos(orderId: string): Promise<OrderPhoto[]> {
+function client(): SupabaseClient | null {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !key || !orderId) return [];
+  if (!url || !key) return null;
+  return createClient(url, key);
+}
+
+/** Read a cached condition assessment for an order, if one exists. */
+export async function fetchCondition(orderId: string): Promise<ConditionAssessment | null> {
+  const supabase = client();
+  if (!supabase || !orderId) return null;
+  try {
+    const { data } = await supabase.storage.from(PHOTO_BUCKET).download(`${safeFolder(orderId)}/_condition.json`);
+    if (!data) return null;
+    return JSON.parse(await data.text()) as ConditionAssessment;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist a condition assessment so it isn't re-run on every report. */
+export async function saveCondition(orderId: string, assessment: ConditionAssessment): Promise<void> {
+  const supabase = client();
+  if (!supabase || !orderId) return;
+  await supabase.storage
+    .from(PHOTO_BUCKET)
+    .upload(`${safeFolder(orderId)}/_condition.json`, new Blob([JSON.stringify(assessment)], { type: "application/json" }), { upsert: true });
+}
+
+export async function fetchOrderPhotos(orderId: string): Promise<OrderPhoto[]> {
+  const supabase = client();
+  if (!supabase || !orderId) return [];
 
   const folder = safeFolder(orderId);
-  const supabase = createClient(url, key);
 
   const { data: list, error } = await supabase.storage.from(PHOTO_BUCKET).list(folder, { limit: 60 });
   if (error || !list) return [];

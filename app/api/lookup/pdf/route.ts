@@ -8,7 +8,8 @@ import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, RGB } from "pdf-lib"
 import type { MarketIntel } from "@/lib/market-data";
 import { buildMarketReport, type RiskRating } from "@/lib/market-report";
 import { REQUIRED_SHOTS } from "@/lib/photo-shots";
-import { fetchOrderPhotos } from "@/lib/order-photos";
+import { fetchOrderPhotos, fetchCondition, saveCondition } from "@/lib/order-photos";
+import { assessCondition, hasAnthropicKey, type ConditionAssessment } from "@/lib/condition";
 import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
@@ -178,6 +179,22 @@ export async function POST(req: NextRequest) {
   const s = intel.subject;
   const reportDate = meta.reportDate || new Date().toISOString().slice(0, 10);
 
+  // Field photos + AI condition (only when an order with photos exists). The
+  // condition assessment is cached per order, so it runs Claude once, not every PDF.
+  const orderPhotos = meta.orderNumber ? await fetchOrderPhotos(meta.orderNumber) : [];
+  let condition: ConditionAssessment | null = null;
+  if (meta.orderNumber && orderPhotos.length > 0) {
+    condition = await fetchCondition(meta.orderNumber);
+    if (!condition && hasAnthropicKey()) {
+      try {
+        condition = await assessCondition(orderPhotos);
+        await saveCondition(meta.orderNumber, condition);
+      } catch {
+        condition = null; // best-effort; report still renders
+      }
+    }
+  }
+
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -222,14 +239,14 @@ export async function POST(req: NextRequest) {
     ? [
         ["MARKET SUPPORT", report.marketSupport.replace("_", " ")],
         ["SALEABILITY", report.saleability],
-        ["CONDITION", "Field"],
+        ["CONDITION", condition?.grade ?? "Field"],
         ["ABSORPTION", intel.absorption.level],
         ["RED FLAGS", `${report.criticalCount}C · ${report.advisoryCount}A`],
       ]
     : [
         ["SALEABILITY", report.saleability],
         ["SUGGESTED LIST", usd(report.suggestedListPrice)],
-        ["CONDITION", "Field"],
+        ["CONDITION", condition?.grade ?? "Field"],
         ["ABSORPTION", intel.absorption.level],
         ["RED FLAGS", `${report.criticalCount}C · ${report.advisoryCount}A`],
       ];
@@ -373,8 +390,33 @@ export async function POST(req: NextRequest) {
   ctx.y -= 6;
 
   text(ctx, "CONDITION", { size: 9, font: bold, color: NAVY, gap: 2 });
-  text(ctx, `${report.conditionStatus}. Condition grade and habitability are set from the field agent's photos. Required shot set:`, { size: 9, gap: 2 });
-  text(ctx, REQUIRED_SHOTS.map((sh) => sh.label).join(" · ") + " · plus any damaged surrounding homes.", { size: 8, indent: 4, color: LIGHT, gap: 8 });
+  if (condition) {
+    text(ctx, condition.gradeLabel, { size: 10, font: bold, color: NAVY, gap: 1 });
+    if (condition.summary) text(ctx, condition.summary, { size: 9, gap: 3 });
+    const cfacts: [string, string][] = [
+      ["Habitability", condition.habitability],
+      ["Occupancy", condition.occupancy],
+      ["Exterior", condition.exterior],
+      ["Interior", condition.interior],
+      ["HVAC", condition.hvac],
+      ["Water heater", condition.waterHeater],
+      ["Electrical", condition.electrical],
+      ["Damage", condition.damage],
+    ];
+    for (const [k, v] of cfacts) {
+      ensure(ctx, 11);
+      ctx.page.drawText(k, { x: MARGIN, y: ctx.y - 8, size: 8, font, color: LIGHT });
+      for (const [i, l] of wrap(v, font, 8, CONTENT_W - 110).entries()) {
+        if (i > 0) ensure(ctx, 10);
+        ctx.page.drawText(l, { x: MARGIN + 110, y: ctx.y - 8, size: 8, font, color: SLATE });
+        ctx.y -= 10;
+      }
+    }
+    text(ctx, `Assessed from ${condition.photoCount} field photo${condition.photoCount === 1 ? "" : "s"} by PropIntel's vision review.`, { size: 7, color: LIGHT, gap: 8 });
+  } else {
+    text(ctx, `${report.conditionStatus}. Condition grade and habitability are set from the field agent's photos. Required shot set:`, { size: 9, gap: 2 });
+    text(ctx, REQUIRED_SHOTS.map((sh) => sh.label).join(" · ") + " · plus any damaged surrounding homes.", { size: 8, indent: 4, color: LIGHT, gap: 8 });
+  }
 
   text(ctx, "NEIGHBORHOOD", { size: 9, font: bold, color: NAVY, gap: 3 });
   for (const f of report.neighborhood) {
@@ -389,8 +431,8 @@ export async function POST(req: NextRequest) {
   for (const n of report.pendingNotes) text(ctx, `• ${n}`, { size: 8, indent: 4, color: LIGHT, gap: 1 });
 
   // ===================== FIELD PHOTOS (from the order's folder) =====================
-  if (meta.orderNumber) {
-    const photos = await fetchOrderPhotos(meta.orderNumber);
+  {
+    const photos = orderPhotos;
     if (photos.length > 0) {
       newPage(ctx, true);
       sectionTitle(ctx, "Field Photos");
