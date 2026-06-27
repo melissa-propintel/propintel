@@ -6,6 +6,8 @@ import { parseCsv, toCsv, type ParsedCsv } from "@/lib/csv";
 import type { MarketIntel } from "@/lib/market-data";
 import { buildMarketReport } from "@/lib/market-report";
 import { buildPortfolioRow, errorRow, gradePortfolio, type PortfolioRow, type Light } from "@/lib/portfolio";
+import { makeZip } from "@/lib/zip";
+import { makeToken, uploadReport, createDelivery, deliveriesConfigured, type DeliveryItem } from "@/lib/deliveries";
 
 type RowStatus = "pending" | "running" | "done" | "error";
 
@@ -74,6 +76,10 @@ export default function BulkPage() {
   const [results, setResults] = useState<RowResult[]>([]);
   const [running, setRunning] = useState(false);
   const [downloading, setDownloading] = useState(false);
+  const [bundling, setBundling] = useState(false);
+  const [bundleMsg, setBundleMsg] = useState("");
+  const [deliveryLink, setDeliveryLink] = useState("");
+  const [linkCopied, setLinkCopied] = useState(false);
 
   function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -181,21 +187,100 @@ export default function BulkPage() {
   const errorCount = results.filter((r) => r.status === "error").length;
   const totalRows = csv?.rows.length ?? 0;
 
-  async function downloadFullPdf(r: RowResult) {
-    if (!r.intel) return;
+  async function reportBlob(r: RowResult): Promise<Blob | null> {
+    if (!r.intel) return null;
     const res = await fetch("/api/lookup/pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ intel: r.intel, meta: { orderNumber: r.address, testValue: r.testValue, testLabel: "Loan / list price" } }),
     });
-    if (!res.ok) return;
-    const blob = await res.blob();
+    if (!res.ok) return null;
+    return res.blob();
+  }
+
+  async function downloadFullPdf(r: RowResult) {
+    const blob = await reportBlob(r);
+    if (!blob) return;
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = `${r.address.replace(/[^\w.-]+/g, "_")}.pdf`;
     a.click();
     URL.revokeObjectURL(url);
+  }
+
+  const doneResults = () => results.filter((r) => r.status === "done" && r.intel);
+
+  // Download every report as one ZIP (the "grab everything" path).
+  async function downloadAllZip() {
+    const done = doneResults();
+    if (done.length === 0) return;
+    setBundling(true);
+    setBundleMsg("");
+    try {
+      const files: { name: string; data: Uint8Array }[] = [];
+      for (let i = 0; i < done.length; i++) {
+        setBundleMsg(`Building ${i + 1}/${done.length}…`);
+        const blob = await reportBlob(done[i]);
+        if (!blob) continue;
+        const data = new Uint8Array(await blob.arrayBuffer());
+        files.push({ name: `${String(i + 1).padStart(3, "0")}-${done[i].address.replace(/[^\w.-]+/g, "_")}.pdf`, data });
+      }
+      const zip = makeZip(files);
+      const url = URL.createObjectURL(zip);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "propintel-reports.zip";
+      a.click();
+      URL.revokeObjectURL(url);
+      setBundleMsg("");
+    } finally {
+      setBundling(false);
+    }
+  }
+
+  // Create a shareable client link with all the reports.
+  async function createDeliveryLink() {
+    const done = doneResults();
+    if (done.length === 0) return;
+    setBundling(true);
+    setDeliveryLink("");
+    setBundleMsg("");
+    try {
+      const token = makeToken();
+      const items: DeliveryItem[] = [];
+      for (let i = 0; i < done.length; i++) {
+        setBundleMsg(`Uploading ${i + 1}/${done.length}…`);
+        const blob = await reportBlob(done[i]);
+        if (!blob) continue;
+        const r = done[i];
+        const item = await uploadReport(token, i, r.address, blob, {
+          light: r.row?.light ?? null,
+          valueLow: r.intel?.valueRange.low ?? null,
+          valueHigh: r.intel?.valueRange.high ?? null,
+        });
+        items.push(item);
+      }
+      await createDelivery(token, fileName || null, items);
+      const link = `${window.location.origin}/d/${token}`;
+      setDeliveryLink(link);
+      setBundleMsg("");
+    } catch (e) {
+      setBundleMsg(e instanceof Error ? e.message : "Could not create the link.");
+    } finally {
+      setBundling(false);
+    }
+  }
+
+  async function copyLink() {
+    if (!deliveryLink) return;
+    try {
+      await navigator.clipboard.writeText(deliveryLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 1500);
+    } catch {
+      /* ignore */
+    }
   }
 
   async function downloadPortfolioPdf() {
@@ -299,6 +384,42 @@ export default function BulkPage() {
               <button onClick={exportResults} className="rounded-md border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Export CSV</button>
             </>
           )}
+        </div>
+      )}
+
+      {/* deliver */}
+      {doneCount > 0 && !running && (
+        <div className="mt-4 rounded-lg border border-pi-border bg-white p-4">
+          <p className="text-sm font-semibold text-pi-navy">Deliver {doneCount} report{doneCount === 1 ? "" : "s"}</p>
+          <div className="mt-2 flex flex-wrap items-center gap-3">
+            <button
+              onClick={downloadAllZip}
+              disabled={bundling}
+              className="rounded-md bg-pi-navy px-4 py-2 text-sm font-semibold text-white hover:bg-pi-navy-soft disabled:opacity-60"
+            >
+              Download all (ZIP)
+            </button>
+            {deliveriesConfigured() && (
+              <button
+                onClick={createDeliveryLink}
+                disabled={bundling}
+                className="rounded-md border border-pi-navy px-4 py-2 text-sm font-semibold text-pi-navy hover:bg-slate-50 disabled:opacity-60"
+              >
+                Create client link
+              </button>
+            )}
+            {bundling && bundleMsg && <span className="text-xs text-slate-500">{bundleMsg}</span>}
+          </div>
+          {deliveryLink && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md bg-slate-50 p-2 text-sm">
+              <span className="text-slate-500">Client link:</span>
+              <a href={deliveryLink} target="_blank" rel="noopener noreferrer" className="font-medium text-pi-accent hover:underline">{deliveryLink}</a>
+              <button onClick={copyLink} className="rounded border border-slate-300 px-2 py-0.5 text-xs text-slate-700 hover:bg-white">
+                {linkCopied ? "Copied!" : "Copy"}
+              </button>
+            </div>
+          )}
+          {!bundling && bundleMsg && <p className="mt-2 text-xs text-red-600">{bundleMsg}</p>}
         </div>
       )}
 
