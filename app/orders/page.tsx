@@ -13,6 +13,7 @@ import {
   type OrderStatus,
   type ProductType,
 } from "@/lib/orders";
+import { listAgents, rankByCoverage, stateFromAddress, type Agent } from "@/lib/agents";
 
 const STATUS_COLOR: Record<OrderStatus, string> = {
   new: "bg-slate-100 text-slate-700",
@@ -36,6 +37,7 @@ export default function OrdersPage() {
   const [creating, setCreating] = useState(false);
   const [copied, setCopied] = useState<string | null>(null);
   const [sendMsg, setSendMsg] = useState<Record<string, string>>({});
+  const [agents, setAgents] = useState<Agent[]>([]);
 
   async function refresh() {
     if (!configured) {
@@ -43,7 +45,9 @@ export default function OrdersPage() {
       return;
     }
     try {
-      setOrders(await listOrders());
+      const [o, a] = await Promise.all([listOrders(), listAgents().catch(() => [])]);
+      setOrders(o);
+      setAgents(a);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load orders.");
     } finally {
@@ -218,16 +222,50 @@ export default function OrdersPage() {
                   {o.product_type === "field" && (
                     <div className="mt-2 flex flex-wrap items-center gap-2">
                       <span className="text-[11px] uppercase tracking-wide text-slate-400">Agent</span>
-                      <input
-                        defaultValue={o.assigned_agent ?? ""}
-                        onBlur={(e) => {
-                          const v = e.target.value.trim();
-                          patch(o, { assigned_agent: v || null, status: o.status === "new" && v ? "assigned" : o.status });
-                          if (v) void maybeEmailAgent({ ...o, assigned_agent: v }, v);
-                        }}
-                        placeholder="agent name + email (auto-sends the link)"
-                        className="min-w-[200px] flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs"
-                      />
+                      {agents.length > 0 ? (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const a = agents.find((x) => x.id === e.target.value);
+                            if (!a) return;
+                            const v = a.email ? `${a.name} <${a.email}>` : a.name;
+                            patch(o, { assigned_agent: v, status: o.status === "new" ? "assigned" : o.status });
+                            void maybeEmailAgent({ ...o, assigned_agent: v }, v);
+                          }}
+                          className="min-w-[200px] flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs"
+                        >
+                          <option value="">
+                            {o.assigned_agent ? `Assigned: ${o.assigned_agent}` : `Choose agent${
+                              stateFromAddress(o.property_address) ? ` (${stateFromAddress(o.property_address)} first)` : ""
+                            }…`}
+                          </option>
+                          {rankByCoverage(
+                            agents.filter((a) => a.active),
+                            stateFromAddress(o.property_address),
+                          ).map((a) => {
+                            const st = stateFromAddress(o.property_address);
+                            const covers = st && (a.coverage_states ?? "").toUpperCase().includes(st);
+                            return (
+                              <option key={a.id} value={a.id}>
+                                {a.name}
+                                {a.coverage_states ? ` — ${a.coverage_states}` : ""}
+                                {covers ? " ✓" : ""}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      ) : (
+                        <input
+                          defaultValue={o.assigned_agent ?? ""}
+                          onBlur={(e) => {
+                            const v = e.target.value.trim();
+                            patch(o, { assigned_agent: v || null, status: o.status === "new" && v ? "assigned" : o.status });
+                            if (v) void maybeEmailAgent({ ...o, assigned_agent: v }, v);
+                          }}
+                          placeholder="agent name + email (add agents on the Agents page)"
+                          className="min-w-[200px] flex-1 rounded-md border border-slate-200 px-2 py-1 text-xs"
+                        />
+                      )}
                       {sendMsg[o.id] && (
                         <span className={`text-[11px] ${sendMsg[o.id].includes("✓") ? "text-emerald-700" : "text-slate-500"}`}>
                           {sendMsg[o.id]}
