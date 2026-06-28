@@ -201,6 +201,40 @@ export default function OrdersPage() {
 
       {error && <div className="mt-4 rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
 
+      {/* who ordered what — counter by client */}
+      {configured && orders.length > 0 && (
+        <div className="mt-5 rounded-lg border border-pi-border bg-white p-4">
+          <h2 className="text-sm font-semibold text-pi-navy">Reports by client</h2>
+          <div className="mt-2 flex flex-col gap-1">
+            {Object.entries(
+              orders.reduce(
+                (acc, o) => {
+                  const k = o.client_name?.trim() || "—";
+                  if (!acc[k]) acc[k] = { total: 0, delivered: 0 };
+                  acc[k].total++;
+                  if (o.status === "delivered") acc[k].delivered++;
+                  return acc;
+                },
+                {} as Record<string, { total: number; delivered: number }>,
+              ),
+            )
+              .sort((a, b) => b[1].total - a[1].total)
+              .map(([client, c]) => (
+                <div key={client} className="flex items-center justify-between text-sm">
+                  <span className="text-slate-700">{client}</span>
+                  <span className="text-slate-500">
+                    {c.total} report{c.total === 1 ? "" : "s"}
+                    {c.delivered ? ` · ${c.delivered} delivered` : ""}
+                  </span>
+                </div>
+              ))}
+          </div>
+          <p className="mt-2 border-t border-pi-border pt-2 text-xs text-slate-400">
+            {orders.length} total orders · {new Set(orders.map((o) => o.client_name?.trim() || "—")).size} clients
+          </p>
+        </div>
+      )}
+
       {/* list */}
       {configured && (
         <div className="mt-5">
