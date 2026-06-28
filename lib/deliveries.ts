@@ -12,6 +12,7 @@ export interface DeliveryItem {
   light: string | null; // GREEN/YELLOW/RED if known
   valueLow: number | null;
   valueHigh: number | null;
+  highlights?: string[]; // the 3-5 line read, shown beside the property on the link
 }
 
 export interface Delivery {
@@ -43,7 +44,7 @@ export async function uploadReport(
   index: number,
   address: string,
   pdf: Blob,
-  meta: { light?: string | null; valueLow?: number | null; valueHigh?: number | null },
+  meta: { light?: string | null; valueLow?: number | null; valueHigh?: number | null; highlights?: string[] },
 ): Promise<DeliveryItem> {
   const s = getSupabase();
   if (!s) throw new Error("Storage not configured.");
@@ -61,6 +62,7 @@ export async function uploadReport(
     light: meta.light ?? null,
     valueLow: meta.valueLow ?? null,
     valueHigh: meta.valueHigh ?? null,
+    highlights: meta.highlights ?? [],
   };
 }
 

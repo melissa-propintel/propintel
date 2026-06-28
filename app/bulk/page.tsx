@@ -258,6 +258,7 @@ export default function BulkPage() {
           light: r.row?.light ?? null,
           valueLow: r.intel?.valueRange.low ?? null,
           valueHigh: r.intel?.valueRange.high ?? null,
+          highlights: r.row?.lines ?? [],
         });
         items.push(item);
       }

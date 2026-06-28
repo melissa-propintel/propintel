@@ -91,24 +91,36 @@ export default function DeliveryPage() {
 
           <div className="mt-4 flex flex-col gap-2">
             {delivery.items.map((item, i) => (
-              <div key={i} className="flex items-center justify-between rounded-lg border border-pi-border bg-white p-3">
-                <div className="flex items-center gap-2">
-                  {item.light && <span className={`h-3 w-3 shrink-0 rounded-full ${LIGHT_DOT[item.light] ?? "bg-slate-300"}`} />}
-                  <div>
-                    <p className="text-sm font-semibold text-slate-800">{item.address}</p>
-                    {(item.valueLow !== null || item.valueHigh !== null) && (
-                      <p className="text-xs text-slate-500">Indicated value {usd(item.valueLow)} – {usd(item.valueHigh)}</p>
-                    )}
+              <div key={i} className="rounded-lg border border-pi-border bg-white p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2">
+                    {item.light && <span className={`mt-1 h-3 w-3 shrink-0 rounded-full ${LIGHT_DOT[item.light] ?? "bg-slate-300"}`} />}
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800">{item.address}</p>
+                      {(item.valueLow !== null || item.valueHigh !== null) && (
+                        <p className="text-xs text-slate-500">Indicated value {usd(item.valueLow)} – {usd(item.valueHigh)}</p>
+                      )}
+                    </div>
                   </div>
+                  <a
+                    href={item.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-pi-navy hover:bg-slate-50"
+                  >
+                    Download PDF
+                  </a>
                 </div>
-                <a
-                  href={item.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-md border border-slate-300 px-3 py-1.5 text-sm font-medium text-pi-navy hover:bg-slate-50"
-                >
-                  Download PDF
-                </a>
+                {item.highlights && item.highlights.length > 0 && (
+                  <ul className="mt-2 space-y-0.5 border-t border-pi-border pt-2 text-xs leading-relaxed text-slate-600">
+                    {item.highlights.map((h, j) => (
+                      <li key={j} className="flex gap-1.5">
+                        <span className="text-pi-accent">·</span>
+                        <span>{h}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             ))}
           </div>
