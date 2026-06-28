@@ -14,9 +14,10 @@ import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
 
-const NAVY = rgb(0.043, 0.122, 0.227);
-const SLATE = rgb(0.28, 0.33, 0.4);
-const LIGHT = rgb(0.62, 0.66, 0.72);
+// Brand: forest green to match the site (pi-green-deep #0F6E56).
+const NAVY = rgb(0.059, 0.431, 0.337);
+const SLATE = rgb(0.28, 0.33, 0.34);
+const LIGHT = rgb(0.6, 0.62, 0.58);
 const RED = rgb(0.73, 0.11, 0.11);
 const GREEN = rgb(0.082, 0.502, 0.239);
 const WHITE = rgb(1, 1, 1);
@@ -192,9 +193,9 @@ export async function POST(req: NextRequest) {
     y: PAGE_H - 26,
     size: 9,
     font,
-    color: rgb(0.8, 0.85, 0.95),
+    color: rgb(0.85, 0.94, 0.91),
   });
-  ctx.page.drawText(TAGLINE, { x: MARGIN, y: PAGE_H - 46, size: 8, font, color: rgb(0.7, 0.78, 0.92) });
+  ctx.page.drawText(TAGLINE, { x: MARGIN, y: PAGE_H - 46, size: 8, font, color: rgb(0.72, 0.86, 0.80) });
   ctx.y = PAGE_H - 74;
 
   const metaLine = `${meta.orderNumber ? "Order " + meta.orderNumber + "  ·  " : ""}${reportDate}${
@@ -227,7 +228,7 @@ export async function POST(req: NextRequest) {
   ctx.page.drawText(`${report.gradeLetter} — ${report.gradeDescriptor}`, { x: MARGIN + 10, y: bTop - 33, size: 17, font: bold, color: WHITE });
   let ry = bTop - 13;
   for (const l of wrap(report.ratingLine, font, 7.5, 230).slice(0, 3)) {
-    ctx.page.drawText(l, { x: PAGE_W - MARGIN - 240, y: ry, size: 7.5, font, color: rgb(0.95, 0.97, 1) });
+    ctx.page.drawText(l, { x: PAGE_W - MARGIN - 240, y: ry, size: 7.5, font, color: rgb(0.92, 0.97, 0.95) });
     ry -= 10;
   }
   ctx.y = bTop - 54;

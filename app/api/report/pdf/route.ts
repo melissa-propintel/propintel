@@ -12,7 +12,7 @@ import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
 
-const NAVY = rgb(0.043, 0.122, 0.227);
+const NAVY = rgb(0.059, 0.431, 0.337);
 const SLATE = rgb(0.28, 0.33, 0.4);
 const LIGHT = rgb(0.62, 0.66, 0.72);
 const RED = rgb(0.73, 0.11, 0.11);
@@ -127,9 +127,9 @@ export async function POST(req: NextRequest) {
     y: PAGE_H - 26,
     size: 9,
     font,
-    color: rgb(0.8, 0.85, 0.95),
+    color: rgb(0.85, 0.94, 0.91),
   });
-  page.drawText(TAGLINE, { x: MARGIN, y: PAGE_H - 46, size: 8, font, color: rgb(0.7, 0.78, 0.92) });
+  page.drawText(TAGLINE, { x: MARGIN, y: PAGE_H - 46, size: 8, font, color: rgb(0.72, 0.86, 0.80) });
   ctx.y = PAGE_H - 76;
 
   // ---- order meta ----

@@ -8,7 +8,7 @@ import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
 
-const NAVY = rgb(0.043, 0.122, 0.227);
+const NAVY = rgb(0.059, 0.431, 0.337);
 const SLATE = rgb(0.28, 0.33, 0.4);
 const LIGHT = rgb(0.62, 0.66, 0.72);
 const WHITE = rgb(1, 1, 1);
@@ -130,8 +130,8 @@ export async function POST(req: NextRequest) {
   ctx.page.drawRectangle({ x: 0, y: PAGE_H - 56, width: PAGE_W, height: 56, color: NAVY });
   ctx.page.drawText("PROPINTEL", { x: MARGIN, y: PAGE_H - 30, size: 16, font: bold, color: WHITE });
   const hdr = "Portfolio Intelligence Report";
-  ctx.page.drawText(hdr, { x: PAGE_W - MARGIN - font.widthOfTextAtSize(hdr, 9), y: PAGE_H - 26, size: 9, font, color: rgb(0.8, 0.85, 0.95) });
-  ctx.page.drawText(TAGLINE, { x: MARGIN, y: PAGE_H - 46, size: 8, font, color: rgb(0.7, 0.78, 0.92) });
+  ctx.page.drawText(hdr, { x: PAGE_W - MARGIN - font.widthOfTextAtSize(hdr, 9), y: PAGE_H - 26, size: 9, font, color: rgb(0.85, 0.94, 0.91) });
+  ctx.page.drawText(TAGLINE, { x: MARGIN, y: PAGE_H - 46, size: 8, font, color: rgb(0.72, 0.86, 0.80) });
   ctx.y = PAGE_H - 76;
 
   ctx.page.drawText(`${reportDate}${meta.clientName ? "  ·  " + meta.clientName : ""}${meta.fileName ? "  ·  " + meta.fileName : ""}  ·  ${grade.total} properties`, { x: MARGIN, y: ctx.y - 8, size: 8, font, color: LIGHT });
