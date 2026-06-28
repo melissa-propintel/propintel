@@ -354,7 +354,6 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
   const ownership: Fact[] = [];
   if (s.ownerNames?.length) ownership.push({ label: "Owner of record", value: s.ownerNames.join("; ") });
   if (s.ownerType) ownership.push({ label: "Owner type", value: s.ownerType });
-  if (s.ownerOccupied !== null) ownership.push({ label: "Owner-occupied", value: s.ownerOccupied ? "Yes" : "No — non-owner-occupied" });
   if (s.saleHistory?.length) {
     for (const e of s.saleHistory.slice(0, 4)) {
       ownership.push({ label: `Sale ${e.date}`, value: `${usd(e.price)}${e.event ? " · " + e.event : ""}` });
@@ -372,7 +371,7 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
       return Number.isFinite(d0) && Number.isFinite(d1) && Math.abs(d0 - d1) < 1000 * 60 * 60 * 24 * 730; // < 2 yrs apart
     })();
   if (recentFlip) ownershipNote = "Two sales within ~2 years — verify the chain of title; rapid resale can signal a flip or a distressed transfer.";
-  else if (entity) ownershipNote = "Entity-owned (LLC/trust) and typically non-owner-occupied — an investor-held asset; expect an investor disposition.";
+  else if (entity) ownershipNote = "Entity-owned (LLC/trust) — typically an investor-held asset; expect an investor disposition.";
   if (ownership.length === 0) ownership.push({ label: "Ownership", value: "Not in the public record we pulled — confirm via title (entity, liens, chain not included)." });
 
   // ---- value methodology ----

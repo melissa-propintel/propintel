@@ -14,8 +14,9 @@ export function Nav() {
   return (
     <header className="no-print border-b border-pi-border bg-white">
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-2.5">
-        <Link href="/" className="text-sm font-black tracking-tight text-pi-navy">
-          PropIntel
+        <Link href="/" className="flex items-center">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/propintel-logo.svg" alt="PropIntel — Property Intelligence" className="h-9 w-auto" />
         </Link>
         <nav className="flex items-center gap-4 text-sm">
           <Link href="/orders" className="text-slate-600 hover:text-pi-navy">
