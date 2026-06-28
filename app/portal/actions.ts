@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { getViewer } from "@/lib/supabase/server";
 
 const FROM = process.env.AGENT_INVITE_FROM || "PropIntel <orders@propintelreport.com>";
-const ORDERS_INBOX = process.env.ORDERS_INBOX || "melissajusticebroker@gmail.com";
+const ORDERS_INBOX = process.env.ORDERS_INBOX || "melissa@propintelreport.com";
 
 // A signed-in client requests a report. We email the request to PropIntel (no
 // AI, plain template) so Melissa can enter the order. The client is NOT charged
