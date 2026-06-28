@@ -19,7 +19,7 @@ export default async function LoginPage({
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/propintel-logo.svg" alt="PropIntel" className="mx-auto h-12 w-auto" />
+          <img src="/propintel-logo.svg" alt="PropIntel" className="mx-auto h-16 w-auto" />
         </div>
 
         <div className="rounded-2xl border border-pi-border bg-white p-6 shadow-sm">
