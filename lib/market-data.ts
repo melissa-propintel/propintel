@@ -169,6 +169,9 @@ export interface MarketIntel {
   medianDom: number | null;
   lenses: LensTake[];
   comps: Comp[];
+  /** Set B — the best-matched comps (3–6 each) the VALUE is built from. The full
+      `comps` set (Set A) drives the market read; these drive value + the grid. */
+  bestComps: { active: Comp[]; sold: Comp[] };
   /** Data confidence + whether agent comps/MLS are required for a defensible value. */
   confidence: DataConfidence;
   /** Long-term rent estimate + range (Rentcast). Null until fetched. */

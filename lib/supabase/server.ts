@@ -32,6 +32,7 @@ export type Role = "admin" | "client";
 // The signed-in user + their role (null if signed out). Role comes from the
 // profiles table; missing profile defaults to "client".
 export async function getViewer(): Promise<{ id: string; email: string | null; role: Role } | null> {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY) return null;
   const supabase = await createClient();
   const {
     data: { user },

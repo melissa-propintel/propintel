@@ -23,9 +23,14 @@ function isPublic(path: string): boolean {
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
 
+  // Auth not configured (e.g. local dev / missing env) → don't gate, don't crash.
+  const supaUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supaAnon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  if (!supaUrl || !supaAnon) return response;
+
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supaUrl,
+    supaAnon,
     {
       cookies: {
         getAll() {

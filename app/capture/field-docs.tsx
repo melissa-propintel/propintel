@@ -11,8 +11,8 @@ type DocKey = "comps" | "subject_mls" | "tax_crs" | "community";
 const DOCS: { key: DocKey; label: string; hint: string; optional?: boolean }[] = [
   {
     key: "comps",
-    label: "Comparables — ALL in competition",
-    hint: "Active, Pending, Contingent, and Sold in the last 6 months, within the radius for the area: ½ mi urban · 1 mi suburban · 5 mi rural. Upload the full set — everything in competition, as pulled.",
+    label: "Comparables — search + agent report",
+    hint: "Everything in competition: Active, Pending, Contingent, and Sold in the last 6 months, within the radius for the area — ½ mi urban · 1 mi suburban · 5 mi rural. The MLS search page covers the market; include your agent/full report so the closest comps have detail. Upload the full set, as pulled.",
   },
   {
     key: "subject_mls",

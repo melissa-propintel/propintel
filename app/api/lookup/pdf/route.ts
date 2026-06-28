@@ -402,9 +402,11 @@ export async function POST(req: NextRequest) {
     text(ctx, "Rent estimate not available for this property.", { size: 8, color: LIGHT, gap: 6 });
   }
 
-  // ===================== COMPARABLES — the comps the value is built on =====================
-  const solds = intel.comps.filter((c) => c.status === "sold");
-  const actives = intel.comps.filter((c) => c.status === "active");
+  // ===================== COMPARABLES — Set B (best matches the value is built on) =====================
+  const allSold = intel.comps.filter((c) => c.status === "sold").length;
+  const allActive = intel.comps.filter((c) => c.status === "active").length;
+  const solds = intel.bestComps.sold;
+  const actives = intel.bestComps.active;
   const compRow = (c: { address: string; price: number | null; distanceMiles: number; beds: number | null; baths: number | null; sqft: number | null; pricePerSqft: number | null; daysOnMarket: number | null; soldDate: string | null }, header: () => void) => {
     if (ctx.y - 11 < FOOT_Y + 36) { newPage(ctx, true); header(); }
     const addr = c.address.length > 30 ? c.address.slice(0, 29) + "…" : c.address;
@@ -424,11 +426,13 @@ export async function POST(req: NextRequest) {
     ctx.y -= 12;
   };
 
-  text(ctx, `SOLD COMPARABLES (${solds.length})`, { size: 9, font: bold, color: NAVY, gap: 3 });
+  text(ctx, "The best-matched comparables, ranked by similarity to the subject. The value is built from the best SOLD comps; the full set in competition drives the market read.", { size: 8, color: LIGHT, gap: 5 });
+
+  text(ctx, `BEST SOLD COMPS — VALUE (${solds.length}${allSold > solds.length ? ` of ${allSold} sold in competition` : ""})`, { size: 9, font: bold, color: NAVY, gap: 3 });
   if (solds.length) { compHeader(); for (const c of solds) compRow(c, compHeader); ctx.y -= 6; }
   else text(ctx, "No sold comps in the window.", { size: 8, color: LIGHT, gap: 6 });
 
-  text(ctx, `ACTIVE LISTINGS (${actives.length})`, { size: 9, font: bold, color: NAVY, gap: 3 });
+  text(ctx, `BEST ACTIVE — COMPETITION (${actives.length}${allActive > actives.length ? ` of ${allActive} active in competition` : ""})`, { size: 9, font: bold, color: NAVY, gap: 3 });
   if (actives.length) { compHeader(); for (const c of actives) compRow(c, compHeader); ctx.y -= 6; }
   else text(ctx, "No active listings in the window.", { size: 8, color: LIGHT, gap: 6 });
 

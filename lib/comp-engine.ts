@@ -11,6 +11,7 @@
 import type {
   SubjectProperty,
   Comp,
+  CompStatus,
   CompRing,
   AbsorptionRead,
   AbsorptionLevel,
@@ -464,6 +465,37 @@ export function scoreConfidence(
 
 // ---- orchestrator ----
 
+// Similarity penalty — lower = closer to the subject. Drives best-comp selection.
+function compSimilarityPenalty(subject: SubjectProperty, c: Comp): number {
+  let p = 0;
+  if (subject.sqft && c.sqft) p += (Math.abs(c.sqft - subject.sqft) / subject.sqft) * 2;
+  else p += 0.5;
+  if (subject.beds != null && c.beds != null) p += Math.abs(c.beds - subject.beds) * 0.3;
+  if (subject.baths != null && c.baths != null) p += Math.abs(c.baths - subject.baths) * 0.2;
+  p += (c.distanceMiles ?? 0.5) * 0.5;
+  return p;
+}
+
+// Set B — the best-matched comps the VALUE is built from. "At least 3, up to 6"
+// of each (active list context + sold value evidence), ranked by similarity. The
+// full set (Set A) still drives the market read; this is the value grid.
+export function selectBestComps(
+  subject: SubjectProperty,
+  comps: Comp[],
+  maxN = 6,
+): { active: Comp[]; sold: Comp[] } {
+  const houses = comps.filter(isHouseComp);
+  const pool = houses.length >= 3 ? houses : comps;
+  const rank = (pred: (s: CompStatus) => boolean) =>
+    pool
+      .filter((c) => pred(c.status) && c.price !== null)
+      .map((c) => ({ c, p: compSimilarityPenalty(subject, c) }))
+      .sort((a, b) => a.p - b.p)
+      .slice(0, maxN)
+      .map((x) => x.c);
+  return { active: rank((s) => s === "active"), sold: rank((s) => s === "sold") };
+}
+
 export function analyzeMarket(
   subject: SubjectProperty,
   comps: Comp[],
@@ -475,9 +507,14 @@ export function analyzeMarket(
   const houses = comps.filter(isHouseComp);
   const compsForRing = houses.length >= 5 ? houses : comps;
   const { ring, selected } = buildRing(compsForRing, windowMonths);
+  // Set A (all in competition) drives the market read.
   const absorption = readAbsorption(selected, windowMonths);
   const priceBands = buildPriceBands(selected);
-  const valueRange = computeValueRange(subject, selected);
+  // Set B (best 3–6 matches) drives the value. Fall back to the full sold set in a
+  // thin market where we can't find at least 3 good sold matches.
+  const bestComps = selectBestComps(subject, selected, 6);
+  const valueComps = bestComps.sold.length >= 3 ? bestComps.sold : selected;
+  const valueRange = computeValueRange(subject, valueComps);
   const doms = selected
     .map((c) => c.daysOnMarket)
     .filter((x): x is number => x !== null && Number.isFinite(x));
@@ -495,6 +532,7 @@ export function analyzeMarket(
     medianDom: medianDom !== null ? Math.round(medianDom) : null,
     lenses,
     comps: selected,
+    bestComps,
     confidence: scoreConfidence(subject, ring, valueRange),
     rent: null, // populated by the route from the data pull
     neighborhood: null, // populated by the route after the market analysis
