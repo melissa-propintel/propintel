@@ -48,6 +48,9 @@ export interface MarketReport {
   keyNumbers: Fact[];
   // §3 Tax Record vs Reality
   taxVsReality: string[];
+  // §4 Ownership
+  ownership: Fact[];
+  ownershipNote: string | null;
   // value methodology
   valueMethodology: string;
   // §8 Community Truth
@@ -347,6 +350,31 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
   }
   if (s.sqft) taxVsReality.push(`Public-record living area: ${s.sqft.toLocaleString()} sqft. Confirm against MLS on a field order — sqft discrepancies move the value.`);
 
+  // ---- §4 Ownership ----
+  const ownership: Fact[] = [];
+  if (s.ownerNames?.length) ownership.push({ label: "Owner of record", value: s.ownerNames.join("; ") });
+  if (s.ownerType) ownership.push({ label: "Owner type", value: s.ownerType });
+  if (s.ownerOccupied !== null) ownership.push({ label: "Owner-occupied", value: s.ownerOccupied ? "Yes" : "No — non-owner-occupied" });
+  if (s.saleHistory?.length) {
+    for (const e of s.saleHistory.slice(0, 4)) {
+      ownership.push({ label: `Sale ${e.date}`, value: `${usd(e.price)}${e.event ? " · " + e.event : ""}` });
+    }
+  }
+  // Light ownership flag: entity-owned, or a rapid resale (possible flip / distress).
+  let ownershipNote: string | null = null;
+  const entity = /llc|inc|trust|holdings|properties|capital|fund|partners/i.test((s.ownerNames ?? []).join(" ") + " " + (s.ownerType ?? ""));
+  const sales = s.saleHistory ?? [];
+  const recentFlip =
+    sales.length >= 2 &&
+    (() => {
+      const d0 = Date.parse(sales[0].date);
+      const d1 = Date.parse(sales[1].date);
+      return Number.isFinite(d0) && Number.isFinite(d1) && Math.abs(d0 - d1) < 1000 * 60 * 60 * 24 * 730; // < 2 yrs apart
+    })();
+  if (recentFlip) ownershipNote = "Two sales within ~2 years — verify the chain of title; rapid resale can signal a flip or a distressed transfer.";
+  else if (entity) ownershipNote = "Entity-owned (LLC/trust) and typically non-owner-occupied — an investor-held asset; expect an investor disposition.";
+  if (ownership.length === 0) ownership.push({ label: "Ownership", value: "Not in the public record we pulled — confirm via title (entity, liens, chain not included)." });
+
   // ---- value methodology ----
   const tierLine =
     value.asIsLow !== null && value.renovatedLow !== null
@@ -423,6 +451,8 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     halfMileStory,
     keyNumbers,
     taxVsReality,
+    ownership,
+    ownershipNote,
     valueMethodology,
     communityCharacter,
     communityEconomics,

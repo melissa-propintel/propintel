@@ -80,6 +80,9 @@ interface RawRecord {
   daysOnMarket?: number;
   distance?: number;
   taxAssessments?: Record<string, { value?: number }>;
+  owner?: { names?: string[]; type?: string };
+  ownerOccupied?: boolean;
+  history?: Record<string, { event?: string; price?: number; date?: string }>;
 }
 
 interface RawAvm {
@@ -120,7 +123,23 @@ function toSubject(rec: RawRecord, addressFallback: string): SubjectProperty {
     lastSaleDate: str(rec.lastSaleDate),
     lastSalePrice: num(rec.lastSalePrice),
     taxAssessedValue: latestTaxAssessment(rec),
+    ownerNames: rec.owner?.names && rec.owner.names.length ? rec.owner.names : null,
+    ownerOccupied: typeof rec.ownerOccupied === "boolean" ? rec.ownerOccupied : null,
+    ownerType: str(rec.owner?.type),
+    saleHistory: historyOf(rec),
   };
+}
+
+// Recent sale events from the property record's history, newest first.
+function historyOf(rec: RawRecord): { date: string; price: number | null; event: string | null }[] | null {
+  const h = rec.history;
+  if (!h) return null;
+  const events = Object.entries(h)
+    .map(([k, v]) => ({ date: str(v?.date) ?? k, price: num(v?.price), event: str(v?.event) }))
+    .filter((e) => e.date)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 5);
+  return events.length ? events : null;
 }
 
 function toComp(
@@ -218,6 +237,10 @@ export async function pullMarketData(address: string): Promise<MarketPull> {
       lastSaleDate: null,
       lastSalePrice: null,
       taxAssessedValue: null,
+      ownerNames: null,
+      ownerOccupied: null,
+      ownerType: null,
+      saleHistory: null,
     };
   }
 

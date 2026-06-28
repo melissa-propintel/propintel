@@ -431,6 +431,20 @@ export async function POST(req: NextRequest) {
   for (const t of report.taxVsReality) text(ctx, t, { size: 9, gap: 3 });
   ctx.y -= 2;
 
+  // §4 OWNERSHIP
+  text(ctx, "OWNERSHIP", { size: 9, font: bold, color: NAVY, gap: 3 });
+  for (const f of report.ownership) {
+    ensure(ctx, 12);
+    ctx.page.drawText(f.label, { x: MARGIN, y: ctx.y - 8, size: 8.5, font, color: LIGHT });
+    for (const [i, l] of wrap(f.value, font, 8.5, CONTENT_W - 160).entries()) {
+      if (i > 0) ensure(ctx, 11);
+      ctx.page.drawText(l, { x: MARGIN + 130, y: ctx.y - 8, size: 8.5, font: bold, color: SLATE });
+      ctx.y -= 11;
+    }
+  }
+  if (report.ownershipNote) text(ctx, report.ownershipNote, { size: 8, color: LIGHT, gap: 2 });
+  text(ctx, "Note: ownership is from the public property record. Liens, judgments, and the full chain of title require a title search — not included.", { size: 7, color: LIGHT, gap: 8 });
+
   text(ctx, "PROPERTY", { size: 9, font: bold, color: NAVY, gap: 3 });
   for (const f of report.propertyFacts) {
     ensure(ctx, 12);

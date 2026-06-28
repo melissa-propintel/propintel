@@ -22,6 +22,13 @@ export function sampleSubject(): SubjectProperty {
     lastSaleDate: "2026-03-01",
     lastSalePrice: 74500,
     taxAssessedValue: 121300,
+    ownerNames: ["Sample Holdings LLC"],
+    ownerOccupied: false,
+    ownerType: "LLC",
+    saleHistory: [
+      { date: "2026-03-01", price: 74500, event: "Sale" },
+      { date: "2019-07-15", price: 58000, event: "Sale" },
+    ],
   };
 }
 

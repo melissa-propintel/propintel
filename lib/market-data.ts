@@ -7,6 +7,12 @@
 
 export type CompStatus = "active" | "pending" | "sold";
 
+export interface SaleEvent {
+  date: string;
+  price: number | null;
+  event: string | null; // "Sale", "Listing", etc.
+}
+
 export interface SubjectProperty {
   address: string;
   city: string;
@@ -24,6 +30,11 @@ export interface SubjectProperty {
   lastSaleDate: string | null;
   lastSalePrice: number | null;
   taxAssessedValue: number | null;
+  /** Ownership (Rentcast property record). */
+  ownerNames: string[] | null;
+  ownerOccupied: boolean | null;
+  ownerType: string | null; // Individual / LLC / Trust / etc.
+  saleHistory: SaleEvent[] | null;
 }
 
 export interface Comp {
