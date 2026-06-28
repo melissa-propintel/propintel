@@ -3,27 +3,25 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 
-async function destFor(supabase: Awaited<ReturnType<typeof createClient>>, next: string): Promise<string> {
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) return "/login";
-  const { data: p } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  const role = (p?.role as string) ?? "client";
-  if (role === "admin") return next && next.startsWith("/") ? next : "/orders";
-  return "/portal";
-}
-
 export async function login(formData: FormData) {
   const supabase = await createClient();
   const email = String(formData.get("email") ?? "").trim();
   const password = String(formData.get("password") ?? "");
   const next = String(formData.get("next") ?? "");
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     redirect(`/login?error=${encodeURIComponent(error.message)}${next ? `&next=${encodeURIComponent(next)}` : ""}`);
   }
-  redirect(await destFor(supabase, next));
+  // Use the user from the sign-in result directly (a second getUser() can race the
+  // freshly-set cookie and come back empty, bouncing back to /login).
+  let role = "client";
+  const uid = data.user?.id;
+  if (uid) {
+    const { data: p } = await supabase.from("profiles").select("role").eq("id", uid).maybeSingle();
+    role = (p?.role as string) ?? "client";
+  }
+  const dest = role === "admin" ? (next && next.startsWith("/") ? next : "/orders") : "/portal";
+  redirect(dest);
 }
 
 export async function signup(formData: FormData) {
