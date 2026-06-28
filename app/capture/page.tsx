@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ADDON_SHOTS, PHOTO_BUCKET, requiredShotsFor, type ShotGroup, type PhotoLevel } from "@/lib/photo-shots";
 import { getSupabase, isStorageConfigured } from "@/lib/supabase-browser";
 import { getOrderByNumber } from "@/lib/orders";
+import { FieldDocs } from "./field-docs";
 
 type ShotStatus = "empty" | "uploading" | "saved" | "demo" | "error";
 
@@ -423,6 +424,9 @@ export default function CapturePage() {
           ))}
         </div>
       </div>
+
+      {/* MLS & field documents + the agent's read */}
+      <FieldDocs folder={safeFolder(order)} />
 
       {/* overall comments */}
       <div className="mt-5">
