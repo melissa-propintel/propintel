@@ -351,19 +351,31 @@ export async function POST(req: NextRequest) {
   );
 
   if (intel.priceBands.length > 0) {
-    text(ctx, "WHAT'S MOVING VS. SITTING", { size: 9, font: bold, color: NAVY, gap: 3 });
-    const c1 = 0, c2 = 230, c3 = 300, c4 = 370;
-    const cols = (cells: { x: number; s: string; b?: boolean; col?: RGB; sz?: number }[]) => {
-      if (ctx.y - 12 < FOOT_Y + 36) newPage(ctx, true);
-      for (const c of cells) ctx.page.drawText(c.s, { x: MARGIN + c.x, y: ctx.y - 8, size: c.sz ?? 8.5, font: c.b ? bold : font, color: c.col ?? SLATE });
-      ctx.y -= 12;
-    };
-    cols([{ x: c1, s: "PRICE BAND", b: true, col: LIGHT, sz: 6.5 }, { x: c2, s: "ACTIVE", b: true, col: LIGHT, sz: 6.5 }, { x: c3, s: "SOLD", b: true, col: LIGHT, sz: 6.5 }, { x: c4, s: "READ", b: true, col: LIGHT, sz: 6.5 }]);
+    text(ctx, "WHAT'S MOVING VS. SITTING", { size: 9, font: bold, color: NAVY, gap: 4 });
+    // legend
+    const GRAY = rgb(0.74, 0.76, 0.72);
+    ctx.page.drawRectangle({ x: MARGIN, y: ctx.y - 4, width: 12, height: 4, color: GRAY });
+    ctx.page.drawText("active (sitting)", { x: MARGIN + 16, y: ctx.y - 4, size: 6.5, font, color: LIGHT });
+    ctx.page.drawRectangle({ x: MARGIN + 92, y: ctx.y - 4, width: 12, height: 4, color: GREEN });
+    ctx.page.drawText("sold (moving)", { x: MARGIN + 108, y: ctx.y - 4, size: 6.5, font, color: LIGHT });
+    ctx.y -= 14;
+    const barX = MARGIN + 92;
+    const BAR_W = 250;
+    const maxCount = Math.max(1, ...intel.priceBands.map((b) => Math.max(b.active, b.sold)));
     for (const b of intel.priceBands) {
+      ensure(ctx, 20);
       const col = b.verdict === "MOVING" ? GREEN : b.verdict === "SITTING" ? RED : SLATE;
-      cols([{ x: c1, s: b.label }, { x: c2, s: String(b.active) }, { x: c3, s: String(b.sold) }, { x: c4, s: b.verdict, b: true, col }]);
+      ctx.page.drawText(b.label, { x: MARGIN, y: ctx.y - 9, size: 7.5, font, color: SLATE });
+      const aw = (b.active / maxCount) * BAR_W;
+      ctx.page.drawRectangle({ x: barX, y: ctx.y - 6, width: b.active > 0 ? Math.max(aw, 1.5) : 0, height: 4, color: GRAY });
+      ctx.page.drawText(String(b.active), { x: barX + aw + 4, y: ctx.y - 7, size: 6.5, font, color: LIGHT });
+      const sw = (b.sold / maxCount) * BAR_W;
+      ctx.page.drawRectangle({ x: barX, y: ctx.y - 13, width: b.sold > 0 ? Math.max(sw, 1.5) : 0, height: 4, color: GREEN });
+      ctx.page.drawText(String(b.sold), { x: barX + sw + 4, y: ctx.y - 14, size: 6.5, font, color: LIGHT });
+      ctx.page.drawText(b.verdict, { x: MARGIN + CONTENT_W - 42, y: ctx.y - 10, size: 7, font: bold, color: col });
+      ctx.y -= 20;
     }
-    ctx.y -= 8;
+    ctx.y -= 6;
   }
 
   // ===================== MARKET INTELLIGENCE (§5) =====================
