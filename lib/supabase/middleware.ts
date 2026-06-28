@@ -13,7 +13,7 @@ const PUBLIC = new Set(["/", "/login", "/signup", "/sample"]);
 // Public path prefixes (token pages, static, APIs, clean views).
 const PUBLIC_PREFIX = ["/d/", "/capture", "/report", "/api/", "/_next/", "/auth/", "/favicon"];
 // Internal tools — admin only.
-const ADMIN_PREFIX = ["/lookup", "/orders", "/bulk", "/audit", "/agents"];
+const ADMIN_PREFIX = ["/lookup", "/orders", "/bulk", "/audit", "/agents", "/extract"];
 
 function isPublic(path: string): boolean {
   if (PUBLIC.has(path)) return true;

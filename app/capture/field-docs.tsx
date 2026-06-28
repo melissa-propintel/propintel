@@ -12,7 +12,7 @@ const DOCS: { key: DocKey; label: string; hint: string; optional?: boolean }[] =
   {
     key: "comps",
     label: "Comparables — ALL in competition",
-    hint: "Active, Pending, Contingent, and Sold in the last 6 months, within the radius for the area: ½ mi urban · 1 mi suburban · 5 mi rural. Upload EVERYTHING in competition — don't hand-pick. We choose the best comps.",
+    hint: "Active, Pending, Contingent, and Sold in the last 6 months, within the radius for the area: ½ mi urban · 1 mi suburban · 5 mi rural. Upload the full set — everything in competition, as pulled.",
   },
   {
     key: "subject_mls",
@@ -76,8 +76,8 @@ export function FieldDocs({ folder }: { folder: string }) {
     <section className="mt-8 rounded-xl border border-pi-border bg-white p-5">
       <h2 className="text-base font-semibold text-pi-navy">MLS &amp; field data</h2>
       <p className="mt-1 text-xs text-slate-500">
-        Upload the documents below — exactly as pulled, no pre-filtering. The platform selects the
-        best comps and builds the value; your job is the data + a quick read.
+        Upload the documents below exactly as pulled — the full set, no pre-filtering. Your job is the
+        data and a quick read.
       </p>
 
       <div className="mt-4 space-y-3">

@@ -30,6 +30,7 @@ export function Nav({ viewer }: { viewer: Viewer }) {
               <Link href="/orders" className="text-slate-600 hover:text-pi-navy">Orders</Link>
               <Link href="/agents" className="text-slate-600 hover:text-pi-navy">Agents</Link>
               <Link href="/lookup" className="text-slate-600 hover:text-pi-navy">New report</Link>
+              <Link href="/extract" className="text-slate-600 hover:text-pi-navy">From docs</Link>
               <Link href="/bulk" className="text-slate-600 hover:text-pi-navy">Portfolio</Link>
               <Link href="/audit" className="text-slate-600 hover:text-pi-navy">Audit a BPO</Link>
               <Link href="/capture" className="text-slate-600 hover:text-pi-navy">Field photos</Link>
