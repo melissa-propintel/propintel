@@ -1,14 +1,28 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f7f4ec; /* cream */
+  --foreground: #2c2c2a; /* slate */
 
-  /* PropIntel brand */
-  --pi-navy: #0b1f3a;
-  --pi-navy-soft: #14304f;
-  --pi-accent: #1f6feb;
-  --pi-border: #e2e8f0;
+  /* PropIntel brand — green / cream / amber.
+     The app's existing pi-navy / pi-accent / pi-border tokens are remapped to the
+     new palette so every tab restyles at once (navy -> forest green). */
+  --pi-navy: #0f6e56;       /* green-deep (primary: headers, buttons, headings) */
+  --pi-navy-soft: #0b5240;  /* darker green (hover) */
+  --pi-accent: #9a6312;     /* amber accent / links (readable on cream) */
+  --pi-border: #e6e0d2;     /* warm hairline border */
+
+  /* Extended palette (home page + accents) */
+  --pi-green-deep: #0f6e56;
+  --pi-green-mid: #1d9e75;
+  --pi-green-dark: #04342c;
+  --pi-green-pale: #e1f5ee;
+  --pi-amber: #ba7517;
+  --pi-amber-text: #854f0b;
+  --pi-cream: #f7f4ec;
+  --pi-slate: #2c2c2a;
+  --pi-slate-mid: #5f5e5a;
+  --pi-slate-soft: #888780;
 
   /* risk grade colors */
   --risk-a: #15803d;
@@ -25,6 +39,16 @@
   --color-pi-navy-soft: var(--pi-navy-soft);
   --color-pi-accent: var(--pi-accent);
   --color-pi-border: var(--pi-border);
+  --color-pi-green-deep: var(--pi-green-deep);
+  --color-pi-green-mid: var(--pi-green-mid);
+  --color-pi-green-dark: var(--pi-green-dark);
+  --color-pi-green-pale: var(--pi-green-pale);
+  --color-pi-amber: var(--pi-amber);
+  --color-pi-amber-text: var(--pi-amber-text);
+  --color-pi-cream: var(--pi-cream);
+  --color-pi-slate: var(--pi-slate);
+  --color-pi-slate-mid: var(--pi-slate-mid);
+  --color-pi-slate-soft: var(--pi-slate-soft);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
