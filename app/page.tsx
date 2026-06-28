@@ -33,7 +33,7 @@ export default function Home() {
             already use.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/lookup" className={primaryBtn}>
+            <Link href="/login?mode=signup" className={primaryBtn}>
               Order a report
             </Link>
             <SampleButton className={outlineBtn}>Get a sample</SampleButton>
@@ -153,7 +153,7 @@ export default function Home() {
             Order your first report, or see a finished one on a property we&apos;ve already done.
           </p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/lookup" className="inline-flex items-center justify-center rounded-lg bg-pi-green-mid px-6 py-3 text-sm font-medium text-white hover:opacity-90 transition">
+            <Link href="/login?mode=signup" className="inline-flex items-center justify-center rounded-lg bg-pi-green-mid px-6 py-3 text-sm font-medium text-white hover:opacity-90 transition">
               Order a report
             </Link>
             <SampleButton className="inline-flex items-center justify-center rounded-lg border-[1.5px] border-white/60 px-6 py-3 text-sm font-medium text-white hover:bg-white/10 transition">
