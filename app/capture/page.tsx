@@ -108,6 +108,29 @@ export default function CapturePage() {
     })();
   }, []);
 
+  // Reload photos already uploaded for this order, so reopening the link shows
+  // what's saved (instead of blank slots). Matches files by shot key.
+  useEffect(() => {
+    if (!order) return;
+    const supabase = getSupabase();
+    if (!supabase) return;
+    const folder = safeFolder(order);
+    void (async () => {
+      const { data: files } = await supabase.storage.from(PHOTO_BUCKET).list(folder);
+      if (!files || files.length === 0) return;
+      const keyOf = (name: string) => name.replace(/-\d+\.jpg$/, "");
+      setShots((prev) =>
+        prev.map((s) => {
+          const match = files.find((f) => f.name.endsWith(".jpg") && keyOf(f.name) === s.key);
+          if (!match) return s;
+          const path = `${folder}/${match.name}`;
+          const { data } = supabase.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+          return { ...s, status: "saved", basePath: path.replace(/\.jpg$/, ""), remoteUrl: data.publicUrl };
+        }),
+      );
+    })();
+  }, [order]);
+
   const requiredShots = shots.filter((s) => s.required);
   const requiredDone = useMemo(
     () => requiredShots.every((s) => s.status === "saved" || s.status === "demo"),
