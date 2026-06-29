@@ -14,7 +14,7 @@ import { analyzeMarket } from "@/lib/comp-engine";
 import type { SubjectProperty, Comp, CompStatus } from "@/lib/market-data";
 
 export const runtime = "nodejs";
-export const maxDuration = 26; // Netlify's max synchronous function time
+export const maxDuration = 60; // Vercel — plenty for server-side PDF read + AI call
 
 // Haiku by default — extraction is a fast structured read, and the host caps
 // function run time (Opus can run past it and the request 504s). Override with
@@ -162,17 +162,53 @@ export async function POST(req: NextRequest) {
   if (!order) return NextResponse.json({ error: "order is required" }, { status: 400 });
 
   const supabase = createClient(url, anon);
+  const folder = `${safeFolder(order)}/docs`;
+  const content: Anthropic.ContentBlockParam[] = [];
 
-  // The browser extracts the PDF text and sends it as docText — the server keeps
-  // a tiny bundle (no pdf.js) and only runs the quick AI call, so the function
-  // starts fast and finishes inside the host's time limit.
-  if (docText.length < 50) {
-    return NextResponse.json(
-      { error: "Couldn't read text from the uploaded documents. Make sure the MLS is a text-based PDF (print-to-PDF) or a CSV — not a scan or screenshot." },
-      { status: 422 },
-    );
+  if (docText.length >= 50) {
+    // Optional fast path: caller already extracted the text.
+    content.push({ type: "text", text: docText.slice(0, MAX_INPUT_CHARS) });
+  } else {
+    // SERVER-SIDE read (reliable — runs in Node like REO Hub). Densest text first
+    // so the compact comp grid always reaches the model, whatever else is uploaded.
+    const { data: files } = await supabase.storage.from(PHOTO_BUCKET).list(folder);
+    const docs = (files ?? []).filter((f) => f.name && !f.name.startsWith("_") && !f.name.endsWith(".json"));
+    if (docs.length === 0) {
+      return NextResponse.json({ error: "No documents uploaded for this order yet." }, { status: 404 });
+    }
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const chunks: { name: string; text: string }[] = [];
+    for (const f of docs) {
+      const { data: blob } = await supabase.storage.from(PHOTO_BUCKET).download(`${folder}/${f.name}`);
+      if (!blob) continue;
+      const lower = f.name.toLowerCase();
+      let text = "";
+      if (lower.endsWith(".pdf")) {
+        try {
+          const buf = new Uint8Array(await blob.arrayBuffer());
+          const pdf = await getDocumentProxy(buf);
+          const res = await extractText(pdf, { mergePages: true });
+          text = (Array.isArray(res.text) ? res.text.join("\n") : res.text) ?? "";
+        } catch {
+          text = "";
+        }
+      } else if (lower.endsWith(".csv") || lower.endsWith(".txt")) {
+        try {
+          text = await blob.text();
+        } catch {
+          text = "";
+        }
+      }
+      if (text && text.trim()) chunks.push({ name: f.name, text: text.trim() });
+    }
+    chunks.sort((a, b) => a.text.length - b.text.length);
+    let combined = "";
+    for (const c of chunks) combined += `\n--- ${c.name} ---\n${c.text}`;
+    if (combined.trim().length < 50) {
+      return NextResponse.json({ error: "Couldn't read text from the uploaded documents (no extractable text)." }, { status: 422 });
+    }
+    content.push({ type: "text", text: combined.slice(0, MAX_INPUT_CHARS) });
   }
-  const content: Anthropic.ContentBlockParam[] = [{ type: "text", text: docText.slice(0, MAX_INPUT_CHARS) }];
   content.push({
     type: "text",
     text:

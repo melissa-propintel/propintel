@@ -10,7 +10,6 @@ import {
   type Order,
   type OrderStatus,
 } from "@/lib/orders";
-import { extractDocText } from "@/lib/extract-client";
 
 const APP = "https://propintelreport.com";
 
@@ -67,16 +66,15 @@ export default function WorkOrderPage() {
     setSummary(null);
     setSample(null);
     try {
-      // Read the PDFs in the browser (no server time limit), send just the text.
-      const docText = await extractDocText(orderNumber);
+      // The SERVER reads the PDFs (reliable). We just kick it off.
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: orderNumber, address: order?.property_address, docText }),
+        body: JSON.stringify({ order: orderNumber, address: order?.property_address }),
       });
       const data = await res.json();
       if (!res.ok) {
-        if (data.sample) setSample(`Browser read ${docText.length.toLocaleString()} chars. Subject seen: ${data.subjectSeen ?? "—"}. Text the AI received (first 1,200 chars):\n\n${data.sample}`);
+        if (data.sample) setSample(`Subject seen: ${data.subjectSeen ?? "—"}. Text the AI received (first 1,200 chars):\n\n${data.sample}`);
         throw new Error(data.error || "Extraction failed");
       }
       setIntel(data.intel);
