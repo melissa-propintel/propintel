@@ -86,7 +86,7 @@ export default function WorkOrderPage() {
     const res = await fetch("/api/lookup/pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intel, meta: { orderNumber, clientName: order?.client_name } }),
+      body: JSON.stringify({ intel, meta: { orderNumber, clientName: order?.client_name, agentRead: field ?? undefined } }),
     });
     if (!res.ok) {
       setErr("PDF build failed");

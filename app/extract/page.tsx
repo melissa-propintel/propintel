@@ -42,7 +42,7 @@ export default function ExtractPage() {
     const res = await fetch("/api/lookup/pdf", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intel, meta: { orderNumber: order } }),
+      body: JSON.stringify({ intel, meta: { orderNumber: order, agentRead: field ?? undefined } }),
     });
     if (!res.ok) {
       setError("PDF build failed");

@@ -155,6 +155,12 @@ interface Meta {
   serviceLine?: string;
   testValue?: number | null;
   testLabel?: string;
+  agentRead?: {
+    recommendedPrice?: string;
+    strategy?: string;
+    areaComparison?: string;
+    comments?: string;
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -400,6 +406,17 @@ export async function POST(req: NextRequest) {
     else ctx.y -= 4;
   } else {
     text(ctx, "Rent estimate not available for this property.", { size: 8, color: LIGHT, gap: 6 });
+  }
+
+  // Field agent's read — the licensed agent's on-the-ground opinion (if provided).
+  const ar = meta.agentRead;
+  if (ar && (ar.recommendedPrice || ar.strategy || ar.areaComparison || ar.comments)) {
+    text(ctx, "FIELD AGENT'S READ", { size: 9, font: bold, color: NAVY, gap: 2 });
+    if (ar.recommendedPrice) text(ctx, `Recommended price: ${ar.recommendedPrice}`, { size: 10, font: bold, color: NAVY, gap: 1 });
+    if (ar.strategy) text(ctx, `Strategy: ${ar.strategy}`, { size: 9, gap: 1 });
+    if (ar.areaComparison) text(ctx, `Vs. the area: ${ar.areaComparison}`, { size: 9, gap: 1 });
+    if (ar.comments) text(ctx, ar.comments, { size: 9, gap: 1 });
+    text(ctx, "The licensed agent's on-the-ground opinion — context the comps can't capture.", { size: 7.5, color: LIGHT, gap: 6 });
   }
 
   // ===================== COMPARABLES — Set B (best matches the value is built on) =====================
