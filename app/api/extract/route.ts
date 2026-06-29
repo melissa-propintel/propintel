@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
+import { extractText, getDocumentProxy } from "unpdf";
 import { PHOTO_BUCKET } from "@/lib/photo-shots";
 import { analyzeMarket } from "@/lib/comp-engine";
 import type { SubjectProperty, Comp, CompStatus } from "@/lib/market-data";
@@ -171,20 +172,41 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "No documents uploaded for this order yet." }, { status: 404 });
   }
 
-  // Build the content blocks (PDF/image as native blocks; CSV/text inline).
+  // Build the content blocks. PDFs are sent as EXTRACTED TEXT (a few KB) instead
+  // of raw base64 (megabytes) — MLS exports are text, and whole-PDF requests blow
+  // past the API size limit (413). Scanned/low-text PDFs fall back to the file
+  // itself only if small; images are capped.
   const content: Anthropic.ContentBlockParam[] = [];
+  let imgCount = 0;
   for (const f of docs) {
     const { data: blob } = await supabase.storage.from(PHOTO_BUCKET).download(`${folder}/${f.name}`);
     if (!blob) continue;
     const mt = mediaType(f.name);
     const buf = Buffer.from(await blob.arrayBuffer());
     if (mt === "application/pdf") {
-      content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } });
-    } else if (mt.startsWith("image/")) {
+      let txt = "";
+      try {
+        const pdf = await getDocumentProxy(new Uint8Array(buf));
+        const res = await extractText(pdf, { mergePages: true });
+        txt = (Array.isArray(res.text) ? res.text.join("\n") : res.text) ?? "";
+      } catch {
+        txt = "";
+      }
+      if (txt.trim().length >= 200) {
+        content.push({ type: "text", text: `--- ${f.name} (MLS PDF) ---\n${txt.slice(0, 120000)}` });
+      } else if (buf.length < 4_000_000) {
+        // Image-based/scanned PDF with little text — send the file itself (small only).
+        content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } });
+      }
+    } else if (mt.startsWith("image/") && imgCount < 4 && buf.length < 4_000_000) {
+      imgCount++;
       content.push({ type: "image", source: { type: "base64", media_type: mt as "image/png" | "image/jpeg", data: buf.toString("base64") } });
-    } else {
-      content.push({ type: "text", text: `--- ${f.name} ---\n${buf.toString("utf-8").slice(0, 60000)}` });
+    } else if (mt === "text/plain") {
+      content.push({ type: "text", text: `--- ${f.name} ---\n${buf.toString("utf-8").slice(0, 120000)}` });
     }
+  }
+  if (content.length === 0) {
+    return NextResponse.json({ error: "Couldn't read the uploaded documents (no extractable text). Try uploading the MLS export as a text-based PDF or CSV." }, { status: 422 });
   }
   content.push({
     type: "text",
