@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { extractDocText } from "@/lib/extract-client";
 
 type Summary = { compsExtracted: number; active: number; sold: number; docs: number };
 type FieldData = { recommendedPrice?: string; strategy?: string; areaComparison?: string; comments?: string };
@@ -20,10 +21,11 @@ export default function ExtractPage() {
     setIntel(null);
     setSummary(null);
     try {
+      const docText = await extractDocText(order);
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order, address }),
+        body: JSON.stringify({ order, address, docText }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Extraction failed");

@@ -10,6 +10,7 @@ import {
   type Order,
   type OrderStatus,
 } from "@/lib/orders";
+import { extractDocText } from "@/lib/extract-client";
 
 const APP = "https://propintelreport.com";
 
@@ -64,10 +65,12 @@ export default function WorkOrderPage() {
     setIntel(null);
     setSummary(null);
     try {
+      // Read the PDFs in the browser (no server time limit), send just the text.
+      const docText = await extractDocText(orderNumber);
       const res = await fetch("/api/extract", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ order: orderNumber, address: order?.property_address }),
+        body: JSON.stringify({ order: orderNumber, address: order?.property_address, docText }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Extraction failed");
