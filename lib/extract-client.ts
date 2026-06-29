@@ -15,7 +15,15 @@ export async function extractDocText(orderNumber: string): Promise<string> {
   if (!supabase) return "";
   const folder = `${safeFolder(orderNumber)}/docs`;
   const { data: files } = await supabase.storage.from(PHOTO_BUCKET).list(folder);
-  const docs = (files ?? []).filter((f) => f.name && !f.name.startsWith("_"));
+  // Smallest files first — the MLS search/grid export (the comp list) is small and
+  // must not get squeezed out by the huge photo-laden full sheets.
+  const docs = (files ?? [])
+    .filter((f) => f.name && !f.name.startsWith("_"))
+    .sort((a, b) => {
+      const sa = (a.metadata?.size as number | undefined) ?? 0;
+      const sb = (b.metadata?.size as number | undefined) ?? 0;
+      return sa - sb;
+    });
   if (docs.length === 0) return "";
 
   const { extractText, getDocumentProxy } = await import("unpdf");
@@ -42,5 +50,5 @@ export async function extractDocText(orderNumber: string): Promise<string> {
       }
     }
   }
-  return out.slice(0, 120000);
+  return out.slice(0, 150000);
 }

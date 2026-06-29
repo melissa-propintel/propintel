@@ -20,7 +20,7 @@ export const maxDuration = 26; // Netlify's max synchronous function time
 // function run time (Opus can run past it and the request 504s). Override with
 // ANTHROPIC_EXTRACT_MODEL if you want a heavier model and have the time budget.
 const MODEL = process.env.ANTHROPIC_EXTRACT_MODEL || "claude-haiku-4-5-20251001";
-const MAX_INPUT_CHARS = 45000; // keep the request small + the call fast (avoid 504)
+const MAX_INPUT_CHARS = 110000; // enough to include the comp grid even with full sheets
 
 function safeFolder(s: string): string {
   return (s.trim() || "unassigned").replace(/[^\w.-]+/g, "_").slice(0, 60);
