@@ -11,6 +11,8 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { PHOTO_BUCKET } from "@/lib/photo-shots";
 import { analyzeMarket } from "@/lib/comp-engine";
+import { hasRentcastKey, pullMarketData, type MarketPull } from "@/lib/rentcast";
+import { mergeSubject, mergeComps } from "@/lib/merge-sources";
 import type { SubjectProperty, Comp, CompStatus } from "@/lib/market-data";
 
 export const runtime = "nodejs";
@@ -232,14 +234,30 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: e instanceof Error ? e.message : "Extraction failed" }, { status: 502 });
   }
 
-  const subject = toSubject(extracted.subject ?? {}, address);
-  const comps = (extracted.comps ?? []).map(toComp);
+  const docSubject = toSubject(extracted.subject ?? {}, address);
+  const docComps = (extracted.comps ?? []).map(toComp);
+
+  // USE BOTH DATA SETS: pull the Rentcast public record and merge it with the
+  // agent's docs. The record fills "no public record" / thin-MLS gaps and adds
+  // sold comps; the docs supply current listing detail. Best-effort — a Rentcast
+  // miss never blocks a doc-based report.
+  let rc: MarketPull | null = null;
+  const lookupAddress = address || docSubject.address;
+  if (hasRentcastKey() && lookupAddress) {
+    try {
+      rc = await pullMarketData(lookupAddress);
+    } catch {
+      rc = null;
+    }
+  }
+  const subject = mergeSubject(docSubject, rc?.subject ?? null);
+  const comps = mergeComps(docComps, rc?.comps ?? []);
+
   if (comps.length === 0) {
     const chars = docText.length;
     return NextResponse.json(
       {
         error: `No comparables found (read ${chars.toLocaleString()} characters).`,
-        // Diagnostics so we can see what actually reached the model.
         sample: docText.slice(0, 1200),
         subjectSeen: subject.address || null,
       },
@@ -266,6 +284,10 @@ export async function POST(req: NextRequest) {
       active: comps.filter((c) => c.status === "active").length,
       sold: comps.filter((c) => c.status === "sold").length,
       docs: content.length - 1, // content blocks minus the instruction
+      // Both-data-set provenance.
+      fromDocs: docComps.length,
+      fromRentcast: rc ? rc.comps.length : 0,
+      publicRecord: !!(rc && (rc.subject.ownerNames || rc.subject.taxAssessedValue || rc.subject.lastSalePrice)),
     },
   });
 }
