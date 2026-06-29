@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 type Summary = { compsExtracted: number; active: number; sold: number; docs: number };
-type FieldData = { recommendedPrice?: string; strategy?: string; comments?: string };
+type FieldData = { recommendedPrice?: string; strategy?: string; areaComparison?: string; comments?: string };
 
 export default function ExtractPage() {
   const [order, setOrder] = useState("");
@@ -110,6 +110,7 @@ export default function ExtractPage() {
                 <p className="font-semibold text-pi-green-dark">Agent&apos;s read</p>
                 {field.recommendedPrice && <p>Recommended: {field.recommendedPrice}</p>}
                 {field.strategy && <p>Strategy: {field.strategy}</p>}
+                {field.areaComparison && <p>Area: {field.areaComparison}</p>}
                 {field.comments && <p>{field.comments}</p>}
               </div>
             )}

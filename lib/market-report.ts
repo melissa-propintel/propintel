@@ -239,6 +239,26 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
       line: `Census-tract vacancy ${nb.vacancyRatePct}% — elevated. A distressed-area signal that reinforces the absorption read.`,
     });
   }
+  // Neighborhood POSITION — is the subject under/over-built for its area? Compare
+  // the indicated value to the area's typical (Census median home value). The comps
+  // value it on true competition; this flags where it sits in the neighborhood.
+  if (nb?.medianHomeValue && nb.medianHomeValue > 1000 && (value.low || value.high)) {
+    const mid = value.low && value.high ? (value.low + value.high) / 2 : (value.high ?? value.low)!;
+    const ratio = mid / nb.medianHomeValue;
+    if (ratio < 0.6) {
+      flags.push({
+        severity: "ADVISORY",
+        category: "Neighborhood",
+        line: `Subject sits well BELOW the area's typical value (${usd(mid)} vs ~${usd(nb.medianHomeValue)} median) — likely the lowest tier / under-built for the neighborhood. Expect a narrower buyer pool and longer marketing; comps value it on its true competition, not the higher-priced homes around it.`,
+      });
+    } else if (ratio > 1.7) {
+      flags.push({
+        severity: "ADVISORY",
+        category: "Neighborhood",
+        line: `Subject sits well ABOVE the area's typical value (${usd(mid)} vs ~${usd(nb.medianHomeValue)} median) — possibly over-improved for the neighborhood. The value may not be fully recoverable; price toward the area ceiling.`,
+      });
+    }
+  }
 
   const criticalCount = flags.filter((f) => f.severity === "CRITICAL").length;
   const advisoryCount = flags.filter((f) => f.severity === "ADVISORY").length;

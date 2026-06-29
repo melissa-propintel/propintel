@@ -30,6 +30,7 @@ export function FieldDocs({ folder }: { folder: string }) {
   const [names, setNames] = useState<Record<string, string>>({});
   const [price, setPrice] = useState("");
   const [strategy, setStrategy] = useState("");
+  const [areaComparison, setAreaComparison] = useState("");
   const [comments, setComments] = useState("");
   const [saved, setSaved] = useState(false);
 
@@ -57,6 +58,7 @@ export function FieldDocs({ folder }: { folder: string }) {
       const meta = JSON.stringify({
         recommendedPrice: price,
         strategy,
+        areaComparison,
         comments,
         updatedAt: new Date().toISOString(),
       });
@@ -122,6 +124,10 @@ export function FieldDocs({ folder }: { folder: string }) {
         <div>
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Strategy</label>
           <input value={strategy} onChange={(e) => setStrategy(e.target.value)} placeholder="e.g. price aggressively / hold / list as-is" className={inputCls} />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">How does it compare to the immediate area?</label>
+          <textarea value={areaComparison} onChange={(e) => setAreaComparison(e.target.value)} rows={2} placeholder="e.g. smallest/oldest home on a street of newer $400k builds — low end for the area." className={inputCls} />
         </div>
         <div>
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Comments</label>

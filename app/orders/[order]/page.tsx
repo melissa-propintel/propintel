@@ -22,7 +22,7 @@ const STATUS_COLOR: Record<OrderStatus, string> = {
 };
 
 type Summary = { compsExtracted: number; active: number; sold: number; docs: number };
-type FieldData = { recommendedPrice?: string; strategy?: string; comments?: string };
+type FieldData = { recommendedPrice?: string; strategy?: string; areaComparison?: string; comments?: string };
 
 export default function WorkOrderPage() {
   const params = useParams();
@@ -186,6 +186,7 @@ export default function WorkOrderPage() {
                   <p className="font-semibold text-pi-green-dark">Agent&apos;s read</p>
                   {field.recommendedPrice && <p>Recommended: {field.recommendedPrice}</p>}
                   {field.strategy && <p>Strategy: {field.strategy}</p>}
+                  {field.areaComparison && <p>Area: {field.areaComparison}</p>}
                   {field.comments && <p>{field.comments}</p>}
                 </div>
               )}
