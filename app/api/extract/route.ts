@@ -17,7 +17,11 @@ import type { SubjectProperty, Comp, CompStatus } from "@/lib/market-data";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-const MODEL = process.env.ANTHROPIC_EXTRACT_MODEL || "claude-opus-4-8";
+// Haiku by default — extraction is a fast structured read, and the host caps
+// function run time (Opus can run past it and the request 504s). Override with
+// ANTHROPIC_EXTRACT_MODEL if you want a heavier model and have the time budget.
+const MODEL = process.env.ANTHROPIC_EXTRACT_MODEL || "claude-haiku-4-5";
+const MAX_INPUT_CHARS = 140000; // keep the request small + fast
 
 function safeFolder(s: string): string {
   return (s.trim() || "unassigned").replace(/[^\w.-]+/g, "_").slice(0, 60);
@@ -178,6 +182,13 @@ export async function POST(req: NextRequest) {
   // itself only if small; images are capped.
   const content: Anthropic.ContentBlockParam[] = [];
   let imgCount = 0;
+  let used = 0; // running text-char budget — keeps the request small + the call fast
+  const pushText = (label: string, body: string) => {
+    if (used >= MAX_INPUT_CHARS) return;
+    const slice = body.slice(0, MAX_INPUT_CHARS - used);
+    used += slice.length;
+    content.push({ type: "text", text: `--- ${label} ---\n${slice}` });
+  };
   for (const f of docs) {
     const { data: blob } = await supabase.storage.from(PHOTO_BUCKET).download(`${folder}/${f.name}`);
     if (!blob) continue;
@@ -193,16 +204,17 @@ export async function POST(req: NextRequest) {
         txt = "";
       }
       if (txt.trim().length >= 200) {
-        content.push({ type: "text", text: `--- ${f.name} (MLS PDF) ---\n${txt.slice(0, 120000)}` });
-      } else if (buf.length < 4_000_000) {
+        pushText(`${f.name} (MLS PDF)`, txt);
+      } else if (buf.length < 3_000_000 && imgCount < 2) {
         // Image-based/scanned PDF with little text — send the file itself (small only).
+        imgCount++;
         content.push({ type: "document", source: { type: "base64", media_type: "application/pdf", data: buf.toString("base64") } });
       }
-    } else if (mt.startsWith("image/") && imgCount < 4 && buf.length < 4_000_000) {
+    } else if (mt.startsWith("image/") && imgCount < 3 && buf.length < 3_000_000) {
       imgCount++;
       content.push({ type: "image", source: { type: "base64", media_type: mt as "image/png" | "image/jpeg", data: buf.toString("base64") } });
     } else if (mt === "text/plain") {
-      content.push({ type: "text", text: `--- ${f.name} ---\n${buf.toString("utf-8").slice(0, 120000)}` });
+      pushText(f.name, buf.toString("utf-8"));
     }
   }
   if (content.length === 0) {
