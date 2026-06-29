@@ -7,6 +7,13 @@ import type { OrderPhoto } from "./order-photos";
 
 export type ConditionGrade = "C1" | "C2" | "C3" | "C4" | "C5" | "C6";
 
+export interface RepairItem {
+  item: string;
+  severity: string; // minor | moderate | major
+  costLow: number | null;
+  costHigh: number | null;
+}
+
 export interface ConditionAssessment {
   grade: ConditionGrade | null;
   gradeLabel: string;
@@ -19,6 +26,10 @@ export interface ConditionAssessment {
   interior: string;
   damage: string;
   summary: string;
+  /** Itemized repairs the photos show are needed, with rough cost ranges. */
+  repairs: RepairItem[];
+  repairTotalLow: number | null;
+  repairTotalHigh: number | null;
   photoCount: number;
   assessedAt: string;
 }
@@ -45,6 +56,23 @@ const CONDITION_SCHEMA = {
     interior: { type: "string", description: "Brief interior condition note, or 'No interior photos' if none." },
     damage: { type: "string", description: "Any visible damage, or 'None visible'." },
     summary: { type: "string", description: "2-3 plain-English sentences a lender/seller can act on." },
+    repairs: {
+      type: "array",
+      description:
+        "Itemized repairs the photos show are needed (roof, foundation/basement, decks/porches, siding, systems, flooring, kitchen/bath, cosmetic/dated, etc.). Estimate rough cost ranges in dollars like a field adjuster — order-of-magnitude is fine. If the home is in good shape, return an empty array.",
+      items: {
+        type: "object",
+        properties: {
+          item: { type: "string", description: "What needs repair, e.g. 'Roof — active leak, likely full replacement'." },
+          severity: { type: "string", enum: ["minor", "moderate", "major"], description: "minor / moderate / major." },
+          costLow: { type: "number", description: "Low end of the rough repair cost, dollars." },
+          costHigh: { type: "number", description: "High end of the rough repair cost, dollars." },
+        },
+        required: ["item"],
+      },
+    },
+    repairTotalLow: { type: "number", description: "Sum (low end) of all repair costs, dollars." },
+    repairTotalHigh: { type: "number", description: "Sum (high end) of all repair costs, dollars." },
   },
   required: ["grade", "habitability", "exterior", "summary"],
 } as const;
@@ -72,7 +100,9 @@ export async function assessCondition(photos: OrderPhoto[]): Promise<ConditionAs
       "You are a property field reviewer. From ONLY these photos, assess the property's condition with the " +
       "record_condition tool. Use the C1–C6 grade scale (C1 new, C3 average minor wear, C5 significant " +
       "deferred maintenance, C6 major rehab / not habitable). If something isn't pictured, say 'Not pictured' " +
-      "rather than guessing. Be specific and factual — no 'appears' or 'seems'.",
+      "rather than guessing. Be specific and factual — no 'appears' or 'seems'. ALSO itemize the repairs the photos " +
+      "show are needed, each with a rough dollar cost range (estimate like a field adjuster — order-of-magnitude is " +
+      "fine), and the report will total them. If the home is in good shape, return an empty repairs list.",
   });
 
   const res = await client.messages.create({
@@ -88,6 +118,20 @@ export async function assessCondition(photos: OrderPhoto[]): Promise<ConditionAs
   const d = toolUse.input as Partial<ConditionAssessment> & { grade?: ConditionGrade | null };
   const grade = d.grade && GRADE_LABEL[d.grade as ConditionGrade] ? (d.grade as ConditionGrade) : null;
 
+  const num = (v: unknown): number | null => (typeof v === "number" && isFinite(v) ? v : null);
+  const rawRepairs: unknown[] = Array.isArray(d.repairs) ? (d.repairs as unknown[]) : [];
+  const repairs: RepairItem[] = rawRepairs
+    .map((r) => (r ?? {}) as Partial<RepairItem>)
+    .filter((r) => typeof r.item === "string" && r.item.trim() !== "")
+    .map((r) => ({
+      item: String(r.item),
+      severity: String(r.severity ?? "moderate"),
+      costLow: num(r.costLow),
+      costHigh: num(r.costHigh) ?? num(r.costLow),
+    }));
+  const sumLow = repairs.reduce((s, r) => s + (r.costLow ?? 0), 0);
+  const sumHigh = repairs.reduce((s, r) => s + (r.costHigh ?? r.costLow ?? 0), 0);
+
   return {
     grade,
     gradeLabel: grade ? GRADE_LABEL[grade] : "Not determinable from photos",
@@ -100,6 +144,9 @@ export async function assessCondition(photos: OrderPhoto[]): Promise<ConditionAs
     interior: d.interior ?? "No interior photos",
     damage: d.damage ?? "None visible",
     summary: d.summary ?? "",
+    repairs,
+    repairTotalLow: num(d.repairTotalLow) ?? (repairs.length ? sumLow : null),
+    repairTotalHigh: num(d.repairTotalHigh) ?? (repairs.length ? sumHigh : null),
     photoCount: ordered.length,
     assessedAt: new Date().toISOString(),
   };

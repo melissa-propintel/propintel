@@ -8,11 +8,12 @@ import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, RGB } from "pdf-lib"
 import type { MarketIntel } from "@/lib/market-data";
 import { buildMarketReport, type RiskRating } from "@/lib/market-report";
 import { REQUIRED_SHOTS } from "@/lib/photo-shots";
-import { fetchOrderPhotos, fetchCondition } from "@/lib/order-photos";
-import type { ConditionAssessment } from "@/lib/condition";
+import { fetchOrderPhotos, fetchCondition, saveCondition } from "@/lib/order-photos";
+import { assessCondition, hasAnthropicKey, type ConditionAssessment } from "@/lib/condition";
 import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 // Brand: forest green to match the site (pi-green-deep #0F6E56).
 const NAVY = rgb(0.059, 0.431, 0.337);
@@ -183,7 +184,32 @@ export async function POST(req: NextRequest) {
   // The condition assessment is generated separately (/api/condition) and cached,
   // so this PDF route stays fast and never blocks on an AI call.
   const orderPhotos = meta.orderNumber ? await fetchOrderPhotos(meta.orderNumber) : [];
-  const condition: ConditionAssessment | null = meta.orderNumber ? await fetchCondition(meta.orderNumber) : null;
+  let condition: ConditionAssessment | null = meta.orderNumber ? await fetchCondition(meta.orderNumber) : null;
+  // If there are field photos but no condition yet (or an older cache without the
+  // repair breakdown), assess + cache now so the report ALWAYS reflects condition
+  // (As-Is vs Repaired), not just the comps.
+  const needsAssess = !condition || !Array.isArray(condition.repairs);
+  if (meta.orderNumber && needsAssess && orderPhotos.length > 0 && hasAnthropicKey()) {
+    try {
+      condition = await assessCondition(orderPhotos);
+      await saveCondition(meta.orderNumber, condition);
+    } catch {
+      condition = null;
+    }
+  }
+
+  // CompanyCam-style value: Repaired (ARV) from comps − estimated repairs = As-Is.
+  const repairLow = condition?.repairTotalLow ?? null;
+  const repairHigh = condition?.repairTotalHigh ?? null;
+  const hasRepairs = (repairLow ?? 0) > 0 || (repairHigh ?? 0) > 0;
+  const arvLow = intel.valueRange.low;
+  const arvHigh = intel.valueRange.high;
+  const asIsLow =
+    arvLow != null && repairHigh != null ? Math.max(0, arvLow - repairHigh)
+    : arvLow != null && repairLow != null ? Math.max(0, arvLow - repairLow)
+    : arvLow;
+  const asIsHigh =
+    arvHigh != null && repairLow != null ? Math.max(0, arvHigh - repairLow) : arvHigh;
 
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
@@ -274,9 +300,17 @@ export async function POST(req: NextRequest) {
   const halfW = (CONTENT_W - 10) / 2;
   const oversupplied = intel.absorption.level === "SEVERE" || intel.absorption.level === "OVERSUPPLIED";
   ctx.page.drawRectangle({ x: MARGIN, y: vTop - 46, width: halfW, height: 46, borderColor: rgb(0.85, 0.87, 0.9), borderWidth: 0.75 });
-  ctx.page.drawText(report.mlsRequired ? "PRELIMINARY VALUE (UNVERIFIED)" : "INDICATED AS-IS VALUE RANGE", { x: MARGIN + 8, y: vTop - 13, size: 6, font: bold, color: report.mlsRequired ? rgb(0.55, 0.32, 0.02) : LIGHT });
-  ctx.page.drawText(`${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}`, { x: MARGIN + 8, y: vTop - 31, size: 15, font: bold, color: NAVY });
-  for (const l of wrap(intel.valueRange.basis, font, 6, halfW - 16).slice(0, 1)) ctx.page.drawText(l, { x: MARGIN + 8, y: vTop - 41, size: 6, font, color: LIGHT });
+  if (hasRepairs) {
+    // Condition-adjusted: lead with As-Is, show Repaired/ARV less repairs underneath.
+    ctx.page.drawText("AS-IS VALUE (CONDITION-ADJUSTED)", { x: MARGIN + 8, y: vTop - 13, size: 6, font: bold, color: rgb(0.55, 0.32, 0.02) });
+    ctx.page.drawText(`${usd(asIsLow)} – ${usd(asIsHigh)}`, { x: MARGIN + 8, y: vTop - 31, size: 15, font: bold, color: NAVY });
+    const repairMid = repairHigh ?? repairLow;
+    ctx.page.drawText(`Repaired/ARV ${usd(arvLow)}–${usd(arvHigh)} less repairs ~${usd(repairLow)}–${usd(repairHigh ?? repairMid)}`, { x: MARGIN + 8, y: vTop - 41, size: 6, font, color: LIGHT });
+  } else {
+    ctx.page.drawText(report.mlsRequired ? "PRELIMINARY VALUE (UNVERIFIED)" : "INDICATED AS-IS VALUE RANGE", { x: MARGIN + 8, y: vTop - 13, size: 6, font: bold, color: report.mlsRequired ? rgb(0.55, 0.32, 0.02) : LIGHT });
+    ctx.page.drawText(`${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}`, { x: MARGIN + 8, y: vTop - 31, size: 15, font: bold, color: NAVY });
+    for (const l of wrap(intel.valueRange.basis, font, 6, halfW - 16).slice(0, 1)) ctx.page.drawText(l, { x: MARGIN + 8, y: vTop - 41, size: 6, font, color: LIGHT });
+  }
   const ax = MARGIN + halfW + 10;
   ctx.page.drawRectangle({ x: ax, y: vTop - 46, width: halfW, height: 46, color: oversupplied ? rgb(0.99, 0.95, 0.95) : undefined, borderColor: oversupplied ? rgb(0.9, 0.7, 0.7) : rgb(0.85, 0.87, 0.9), borderWidth: 0.75 });
   ctx.page.drawText("ABSORPTION", { x: ax + 8, y: vTop - 13, size: 6, font: bold, color: LIGHT });
@@ -510,6 +544,23 @@ export async function POST(req: NextRequest) {
         ctx.page.drawText(l, { x: MARGIN + 110, y: ctx.y - 8, size: 8, font, color: SLATE });
         ctx.y -= 10;
       }
+    }
+    const repairList = condition.repairs ?? [];
+    if (repairList.length > 0) {
+      ctx.y -= 2;
+      text(ctx, "REPAIRS NEEDED (from photos)", { size: 8, font: bold, color: NAVY, gap: 2 });
+      for (const r of repairList) {
+        ensure(ctx, 11);
+        const cost = r.costLow != null || r.costHigh != null ? `  ${usd(r.costLow)}–${usd(r.costHigh ?? r.costLow)}` : "";
+        for (const [i, l] of wrap(`• ${r.item}${cost}`, font, 8, CONTENT_W).entries()) {
+          if (i > 0) ensure(ctx, 10);
+          ctx.page.drawText(l, { x: MARGIN, y: ctx.y - 8, size: 8, font, color: SLATE });
+          ctx.y -= 10;
+        }
+      }
+      ensure(ctx, 22);
+      text(ctx, `Estimated repairs: ${usd(repairLow)} – ${usd(repairHigh)}`, { size: 8.5, font: bold, color: rgb(0.55, 0.32, 0.02), gap: 1 });
+      text(ctx, `Repaired / ARV value ${usd(arvLow)} – ${usd(arvHigh)}   less repairs   =   As-is value ${usd(asIsLow)} – ${usd(asIsHigh)}`, { size: 8.5, font: bold, color: NAVY, gap: 3 });
     }
     text(ctx, `Assessed from ${condition.photoCount} field photo${condition.photoCount === 1 ? "" : "s"} by PropIntel's vision review.`, { size: 7, color: LIGHT, gap: 8 });
   } else {
