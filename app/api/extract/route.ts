@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
   content.push({
     type: "text",
     text:
-      "These are the MLS / comparable / tax documents for one property order. Extract the SUBJECT property and EVERY comparable property shown (active, pending, contingent, and sold). Do not filter, rank, or drop any comp — capture them all exactly as shown. Use the record_extraction tool.",
+      "The text above was extracted from MLS / comparable / tax PDFs for one property order. It may be messy — table columns can be jumbled, wrapped, or out of order because it came from a PDF. Do your best to identify EACH property listing in it. Extract the SUBJECT property and EVERY comparable property (active, pending, contingent, and sold) — each address with whatever price, status, beds, baths, sqft, and dates you can associate with it. A row often looks like an address followed by a price and bed/bath/sqft numbers. Capture them ALL; do not filter or drop any. If a field is unclear, omit just that field, not the whole comp. Use the record_extraction tool.",
   });
 
   const client = new Anthropic({ apiKey });
@@ -199,7 +199,12 @@ export async function POST(req: NextRequest) {
   const subject = toSubject(extracted.subject ?? {}, address);
   const comps = (extracted.comps ?? []).map(toComp);
   if (comps.length === 0) {
-    return NextResponse.json({ error: "No comparables found in the uploaded documents." }, { status: 422 });
+    const chars = docText.length;
+    const hint =
+      chars < 800
+        ? "Very little text was read — the MLS PDF is likely a scan/screenshot. Re-export it from the MLS as a text PDF (print to PDF) or a CSV."
+        : "Plenty of text was read, but no comp rows were recognized — make sure you uploaded the MLS SEARCH/grid export (the list of comps), not just the subject's sheet.";
+    return NextResponse.json({ error: `No comparables found (read ${chars.toLocaleString()} characters). ${hint}` }, { status: 422 });
   }
 
   const intel = analyzeMarket(subject, comps, false);
