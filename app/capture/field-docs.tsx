@@ -11,8 +11,8 @@ type DocKey = "comps" | "subject_mls" | "tax_crs" | "community";
 const DOCS: { key: DocKey; label: string; hint: string; optional?: boolean }[] = [
   {
     key: "comps",
-    label: "Comparables — search + agent report",
-    hint: "Everything in competition: Active, Pending, Contingent, and Sold in the last 6 months, within the radius for the area — ½ mi urban · 1 mi suburban · 5 mi rural. The MLS search page covers the market; include your agent/full report so the closest comps have detail. Upload the full set, as pulled.",
+    label: "Comparables — all in competition",
+    hint: "Everything in competition: Active, Pending, Contingent, and Sold in the last 6 months, within the radius for the area — ½ mi urban · 1 mi suburban · 5 mi rural. If there aren't enough in competition at that radius, INCREASE the distance until you have a solid set. The MLS search page covers the market; include your agent/full report so the closest comps have detail. Upload the full set, as pulled.",
   },
   {
     key: "subject_mls",
@@ -112,7 +112,9 @@ export function FieldDocs({ folder }: { folder: string }) {
       </div>
 
       <div className="mt-5 space-y-3 border-t border-pi-border pt-4">
-        <p className="text-sm font-medium text-pi-navy">Your read (short, but crucial)</p>
+        <p className="text-sm font-medium text-pi-navy">
+          Your read <span className="font-normal text-slate-400">(optional — we can complete the report without it)</span>
+        </p>
         <div>
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Recommended price</label>
           <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="$" className={inputCls} />
