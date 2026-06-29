@@ -38,6 +38,7 @@ export default function WorkOrderPage() {
   const [intel, setIntel] = useState<unknown | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [field, setField] = useState<FieldData | null>(null);
+  const [sample, setSample] = useState<string | null>(null);
 
   useEffect(() => {
     void (async () => {
@@ -64,6 +65,7 @@ export default function WorkOrderPage() {
     setErr(null);
     setIntel(null);
     setSummary(null);
+    setSample(null);
     try {
       // Read the PDFs in the browser (no server time limit), send just the text.
       const docText = await extractDocText(orderNumber);
@@ -73,7 +75,10 @@ export default function WorkOrderPage() {
         body: JSON.stringify({ order: orderNumber, address: order?.property_address, docText }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Extraction failed");
+      if (!res.ok) {
+        if (data.sample) setSample(`Browser read ${docText.length.toLocaleString()} chars. Subject seen: ${data.subjectSeen ?? "—"}. Text the AI received (first 1,200 chars):\n\n${data.sample}`);
+        throw new Error(data.error || "Extraction failed");
+      }
       setIntel(data.intel);
       setSummary(data.summary);
       setField(data.fieldData);
@@ -169,6 +174,9 @@ export default function WorkOrderPage() {
             {extracting ? "Reading documents…" : "Build report from uploaded data"}
           </button>
           {err && <p className="mt-2 text-sm text-red-600">{err}</p>}
+          {sample && (
+            <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap rounded-md border border-pi-border bg-pi-cream p-3 text-[11px] text-pi-slate-mid">{sample}</pre>
+          )}
 
           {summary && (
             <div className="mt-4 space-y-2 border-t border-pi-border pt-4">

@@ -200,11 +200,15 @@ export async function POST(req: NextRequest) {
   const comps = (extracted.comps ?? []).map(toComp);
   if (comps.length === 0) {
     const chars = docText.length;
-    const hint =
-      chars < 800
-        ? "Very little text was read — the MLS PDF is likely a scan/screenshot. Re-export it from the MLS as a text PDF (print to PDF) or a CSV."
-        : "Plenty of text was read, but no comp rows were recognized — make sure you uploaded the MLS SEARCH/grid export (the list of comps), not just the subject's sheet.";
-    return NextResponse.json({ error: `No comparables found (read ${chars.toLocaleString()} characters). ${hint}` }, { status: 422 });
+    return NextResponse.json(
+      {
+        error: `No comparables found (read ${chars.toLocaleString()} characters).`,
+        // Diagnostics so we can see what actually reached the model.
+        sample: docText.slice(0, 1200),
+        subjectSeen: subject.address || null,
+      },
+      { status: 422 },
+    );
   }
 
   const intel = analyzeMarket(subject, comps, false);
