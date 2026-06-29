@@ -249,11 +249,11 @@ export default function OrdersPage() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="text-sm font-bold text-pi-navy">{o.order_number}</span>
+                        <Link href={`/orders/${encodeURIComponent(o.order_number)}`} className="text-sm font-bold text-pi-navy hover:underline">{o.order_number}</Link>
                         <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${STATUS_COLOR[o.status]}`}>{o.status.replace("_", " ")}</span>
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{o.product_type}</span>
                       </div>
-                      <p className="mt-0.5 text-sm text-slate-700">{o.property_address}</p>
+                      <Link href={`/orders/${encodeURIComponent(o.order_number)}`} className="mt-0.5 block text-sm text-slate-700 hover:underline">{o.property_address}</Link>
                       <p className="text-xs text-slate-500">{o.client_name || "—"}{o.loan_amount ? ` · loan $${o.loan_amount.toLocaleString()}` : ""}</p>
                     </div>
                     <div className="flex flex-col items-end gap-1.5">
