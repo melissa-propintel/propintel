@@ -15,13 +15,13 @@ import { analyzeMarket } from "@/lib/comp-engine";
 import type { SubjectProperty, Comp, CompStatus } from "@/lib/market-data";
 
 export const runtime = "nodejs";
-export const maxDuration = 120;
+export const maxDuration = 26; // Netlify's max synchronous function time
 
 // Haiku by default — extraction is a fast structured read, and the host caps
 // function run time (Opus can run past it and the request 504s). Override with
 // ANTHROPIC_EXTRACT_MODEL if you want a heavier model and have the time budget.
 const MODEL = process.env.ANTHROPIC_EXTRACT_MODEL || "claude-haiku-4-5-20251001";
-const MAX_INPUT_CHARS = 90000; // keep the request small + the call fast (avoid 504)
+const MAX_INPUT_CHARS = 45000; // keep the request small + the call fast (avoid 504)
 
 function safeFolder(s: string): string {
   return (s.trim() || "unassigned").replace(/[^\w.-]+/g, "_").slice(0, 60);
@@ -231,7 +231,7 @@ export async function POST(req: NextRequest) {
   try {
     const msg = await client.messages.create({
       model: MODEL,
-      max_tokens: 5000,
+      max_tokens: 4000,
       tools: [EXTRACTION_TOOL],
       tool_choice: { type: "tool", name: "record_extraction" },
       messages: [{ role: "user", content }],
