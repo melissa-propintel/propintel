@@ -15,40 +15,40 @@ export async function extractDocText(orderNumber: string): Promise<string> {
   if (!supabase) return "";
   const folder = `${safeFolder(orderNumber)}/docs`;
   const { data: files } = await supabase.storage.from(PHOTO_BUCKET).list(folder);
-  // Smallest files first — the MLS search/grid export (the comp list) is small and
-  // must not get squeezed out by the huge photo-laden full sheets.
-  const docs = (files ?? [])
-    .filter((f) => f.name && !f.name.startsWith("_"))
-    .sort((a, b) => {
-      const sa = (a.metadata?.size as number | undefined) ?? 0;
-      const sb = (b.metadata?.size as number | undefined) ?? 0;
-      return sa - sb;
-    });
+  const docs = (files ?? []).filter((f) => f.name && !f.name.startsWith("_"));
   if (docs.length === 0) return "";
 
   const { extractText, getDocumentProxy } = await import("unpdf");
-  let out = "";
+  const chunks: { name: string; text: string }[] = [];
   for (const f of docs) {
     const name = f.name.toLowerCase();
     const { data: blob } = await supabase.storage.from(PHOTO_BUCKET).download(`${folder}/${f.name}`);
     if (!blob) continue;
+    let text = "";
     if (name.endsWith(".pdf")) {
       try {
         const buf = new Uint8Array(await blob.arrayBuffer());
         const pdf = await getDocumentProxy(buf);
         const res = await extractText(pdf, { mergePages: true });
-        const t = Array.isArray(res.text) ? res.text.join("\n") : res.text;
-        if (t && t.trim()) out += `\n--- ${f.name} ---\n${t}`;
+        text = (Array.isArray(res.text) ? res.text.join("\n") : res.text) ?? "";
       } catch {
         /* skip unreadable PDF */
       }
     } else if (name.endsWith(".csv") || name.endsWith(".txt")) {
       try {
-        out += `\n--- ${f.name} ---\n${await blob.text()}`;
+        text = await blob.text();
       } catch {
         /* skip */
       }
     }
+    if (text && text.trim()) chunks.push({ name: f.name, text: text.trim() });
   }
+
+  // Densest-first: the MLS comp GRID is compact text; verbose full sheets (and the
+  // photo pages around them) are big. Feeding the smallest text first guarantees
+  // the grid reaches the model even when an agent dumps in everything they have.
+  chunks.sort((a, b) => a.text.length - b.text.length);
+  let out = "";
+  for (const c of chunks) out += `\n--- ${c.name} ---\n${c.text}`;
   return out.slice(0, 150000);
 }
