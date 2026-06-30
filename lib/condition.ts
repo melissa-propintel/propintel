@@ -102,7 +102,10 @@ export async function assessCondition(photos: OrderPhoto[]): Promise<ConditionAs
       "deferred maintenance, C6 major rehab / not habitable). If something isn't pictured, say 'Not pictured' " +
       "rather than guessing. Be specific and factual — no 'appears' or 'seems'. ALSO itemize the repairs the photos " +
       "show are needed, each with a rough dollar cost range (estimate like a field adjuster — order-of-magnitude is " +
-      "fine), and the report will total them. If the home is in good shape, return an empty repairs list.",
+      "fine), and the report will total them. If the home is in good shape, say so plainly and return an empty " +
+      "repairs list. Also note the SURROUNDINGS/street if the photos show them — a neighbor's inoperable/junk " +
+      "vehicles, debris, or boarded/distressed adjacent homes, OR a well-kept block — in the exterior/damage " +
+      "fields, since they affect marketability.",
   });
 
   const res = await client.messages.create({
