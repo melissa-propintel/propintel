@@ -312,6 +312,13 @@ export async function POST(req: NextRequest) {
   const vRatingColor = analysis?.riskGrade ? gradeColor(analysis.riskGrade) : RATING_COLOR[report.rating];
   const vCrit = analysis ? analysis.redFlags.filter((f) => /critical/i.test(f)).length : report.criticalCount;
   const vAdv = analysis ? analysis.redFlags.filter((f) => /advisor/i.test(f)).length : report.advisoryCount;
+  // Suggested list must match the engine's tier — a distressed/not-financeable
+  // subject lists in its as-is range, NOT at the retail ARV top.
+  const vSuggestedList = analysis
+    ? analysis.financeable === false || analysis.subjectTier === "distressed"
+      ? analysis.asIsHigh ?? report.suggestedListPrice
+      : analysis.repairedHigh ?? report.suggestedListPrice
+    : report.suggestedListPrice;
 
   // Rating banner — letter grade + descriptor (v1.1)
   ensure(ctx, 46);
@@ -337,7 +344,7 @@ export async function POST(req: NextRequest) {
       ]
     : [
         ["SALEABILITY", report.saleability],
-        ["SUGGESTED LIST", usd(report.suggestedListPrice)],
+        ["SUGGESTED LIST", usd(vSuggestedList)],
         ["CONDITION", condition?.grade ?? "Field"],
         ["ABSORPTION", intel.absorption.level],
         ["RED FLAGS", `${vCrit}C · ${vAdv}A`],
@@ -510,8 +517,10 @@ export async function POST(req: NextRequest) {
   text(ctx, "VALUE & METHODOLOGY", { size: 9, font: bold, color: NAVY, gap: 2 });
   text(ctx, `Indicated as-is value range: ${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}.`, { size: 10, font: bold, color: NAVY, gap: 1 });
   text(ctx, report.valueMethodology, { size: 9, gap: 2 });
-  if (report.suggestedListPrice) {
-    text(ctx, `Suggested list price (normal window): ${usd(report.suggestedListPrice)} — ${report.saleabilityLine}`, { size: 9, gap: 6 });
+  if (analysis && (analysis.financeable === false || analysis.subjectTier === "distressed")) {
+    text(ctx, `Suggested list (as-is / investor): ${usd(vSuggestedList)} — price to the distressed tier; the retail ${usd(vRepLow)}–${usd(vRepHigh)} requires the full rehab and is not achievable as-is.`, { size: 9, gap: 6 });
+  } else if (report.suggestedListPrice) {
+    text(ctx, `Suggested list price (normal window): ${usd(vSuggestedList)} — ${report.saleabilityLine}`, { size: 9, gap: 6 });
   } else {
     ctx.y -= 4;
   }
