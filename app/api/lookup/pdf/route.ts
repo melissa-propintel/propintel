@@ -510,7 +510,7 @@ export async function POST(req: NextRequest) {
   text(ctx, `${report.marketStrength} market.`, { size: 11, font: bold, color: NAVY, gap: 1 });
   text(ctx, report.realMarketLine, { size: 9, gap: 5 });
   text(ctx, "BUYER POOL", { size: 8, font: bold, color: LIGHT, gap: 1 });
-  text(ctx, report.buyerPool, { size: 9, gap: 5 });
+  text(ctx, analysis?.buyerPool ? `${analysis.buyerPool}. ${report.buyerPool}` : report.buyerPool, { size: 9, gap: 5 });
   text(ctx, "HALF-MILE RADIUS", { size: 8, font: bold, color: LIGHT, gap: 1 });
   text(ctx, report.halfMileStory, { size: 9, gap: 6 });
   text(ctx, "ABSORPTION", { size: 8, font: bold, color: LIGHT, gap: 1 });
@@ -556,7 +556,11 @@ export async function POST(req: NextRequest) {
   newPage(ctx, true);
   sectionTitle(ctx, "Market Intelligence");
   text(ctx, "VALUE & METHODOLOGY", { size: 9, font: bold, color: NAVY, gap: 2 });
-  text(ctx, `Indicated as-is value range: ${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}.`, { size: 10, font: bold, color: NAVY, gap: 1 });
+  if (analysis) {
+    text(ctx, `As-is value ${usd(vAsIsLow)} – ${usd(vAsIsHigh)}   ·   Repaired / ARV ${usd(vRepLow)} – ${usd(vRepHigh)}   ·   spread ~${usd(analysis.spread)}.`, { size: 10, font: bold, color: NAVY, gap: 1 });
+  } else {
+    text(ctx, `Indicated as-is value range: ${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}.`, { size: 10, font: bold, color: NAVY, gap: 1 });
+  }
   text(ctx, report.valueMethodology, { size: 9, gap: 2 });
   if (analysis && (analysis.financeable === false || analysis.subjectTier === "distressed")) {
     text(ctx, `Suggested list (as-is / investor): ${usd(vSuggestedList)} — price to the distressed tier; the retail ${usd(vRepLow)}–${usd(vRepHigh)} requires the full rehab and is not achievable as-is.`, { size: 9, gap: 6 });
@@ -731,7 +735,16 @@ export async function POST(req: NextRequest) {
   // ===================== SUMMARY & NEXT STEPS (§9) =====================
   newPage(ctx, true);
   sectionTitle(ctx, "Summary & Next Steps");
-  for (const sline of report.summary) text(ctx, sline, { size: 9.5, gap: 4 });
+  if (analysis?.bottomLine) {
+    text(ctx, "BOTTOM LINE", { size: 9, font: bold, color: NAVY, gap: 1 });
+    text(ctx, analysis.bottomLine, { size: 9.5, gap: 4 });
+    if (analysis.dispositionCall) {
+      text(ctx, "DISPOSITION", { size: 9, font: bold, color: rgb(0.07, 0.4, 0.3), gap: 1 });
+      text(ctx, analysis.dispositionCall, { size: 9.5, color: rgb(0.1, 0.3, 0.22), gap: 4 });
+    }
+  } else {
+    for (const sline of report.summary) text(ctx, sline, { size: 9.5, gap: 4 });
+  }
   ctx.y -= 4;
   text(ctx, "DATA NOTES", { size: 9, font: bold, color: NAVY, gap: 2 });
   for (const n of report.pendingNotes) text(ctx, `- ${n}`, { size: 8, indent: 4, color: LIGHT, gap: 1 });
