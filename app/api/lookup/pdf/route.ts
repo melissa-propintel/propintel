@@ -14,7 +14,7 @@ import { runAnalysis, hasAnalysisKey, type ReportAnalysis } from "@/lib/analysis
 import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 // Brand: forest green to match the site (pi-green-deep #0F6E56).
 const NAVY = rgb(0.059, 0.431, 0.337);

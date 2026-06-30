@@ -16,7 +16,7 @@ import { mergeSubject, mergeComps } from "@/lib/merge-sources";
 import type { SubjectProperty, Comp, CompStatus } from "@/lib/market-data";
 
 export const runtime = "nodejs";
-export const maxDuration = 60; // Vercel — plenty for server-side PDF read + AI call
+export const maxDuration = 300; // Vercel — headroom for many uploaded docs + AI calls
 
 // Haiku by default — extraction is a fast structured read, and the host caps
 // function run time (Opus can run past it and the request 504s). Override with

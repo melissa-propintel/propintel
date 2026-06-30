@@ -49,17 +49,22 @@ export async function saveCondition(orderId: string, assessment: ConditionAssess
 
 /** Read the order's uploaded MLS / CRS / tax docs as text so the value engine can
  *  scan for distress signals (foreclosure, redemption, As-Is, room-list bed count). */
-export async function fetchOrderDocsText(orderId: string, maxChars = 60000): Promise<string> {
+export async function fetchOrderDocsText(orderId: string, maxChars = 50000, maxFiles = 12): Promise<string> {
   const supabase = client();
   if (!supabase || !orderId) return "";
   const folder = `${safeFolder(orderId)}/docs`;
   try {
-    const { data: files } = await supabase.storage.from(PHOTO_BUCKET).list(folder, { limit: 60 });
-    const docs = (files ?? []).filter((f) => f.name && !f.name.startsWith("_") && !f.name.endsWith(".json"));
+    const { data: files } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .list(folder, { limit: 60, sortBy: { column: "created_at", order: "desc" } });
+    const docs = (files ?? [])
+      .filter((f) => f.name && !f.name.startsWith("_") && !f.name.endsWith(".json"))
+      .slice(0, maxFiles); // bound work — a folder can have many re-uploads of the same docs
     if (docs.length === 0) return "";
     const { extractText, getDocumentProxy } = await import("unpdf");
-    const chunks: string[] = [];
+    let combined = "";
     for (const f of docs) {
+      if (combined.length >= maxChars) break; // stop early once we have enough
       const { data: blob } = await supabase.storage.from(PHOTO_BUCKET).download(`${folder}/${f.name}`);
       if (!blob) continue;
       const lower = f.name.toLowerCase();
@@ -80,9 +85,9 @@ export async function fetchOrderDocsText(orderId: string, maxChars = 60000): Pro
           text = "";
         }
       }
-      if (text && text.trim()) chunks.push(`--- ${f.name} ---\n${text.trim()}`);
+      if (text && text.trim()) combined += `\n--- ${f.name} ---\n${text.trim()}`;
     }
-    return chunks.join("\n").slice(0, maxChars);
+    return combined.slice(0, maxChars);
   } catch {
     return "";
   }
