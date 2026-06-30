@@ -5,12 +5,19 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { ANALYSIS_ENGINE_PROMPT } from "./analysis-engine-spec";
 
+export interface RedFlag {
+  severity: string; // CRITICAL | ADVISORY
+  category: string;
+  finding: string;
+}
+
 export interface ReportAnalysis {
   verdictLine: string;
   riskGrade: string; // A-F
   riskLabel: string;
+  bottomLine: string;
   marketRead: string;
-  redFlags: string[];
+  redFlags: RedFlag[];
   conditionToValue: string;
   trueBeds: number | null;
   trueBaths: number | null;
@@ -33,8 +40,21 @@ const SCHEMA = {
     verdictLine: { type: "string", description: "One line: '{GRADE} — {label}. As-is {low}-{high} ({buyer pool}). Repaired {low}-{high}.'" },
     riskGrade: { type: "string", enum: ["A", "B", "C", "D", "F"], description: "Derived from reconciled value + flags (Rule 6), NOT absorption. Critical flag or not-financeable or >15% value gap => no better than C." },
     riskLabel: { type: "string", description: "e.g. Low / Moderate / Elevated / High." },
+    bottomLine: { type: "string", description: "BOTTOM LINE FOR THE CLIENT — a single plain-English paragraph (3-5 sentences) a lender/asset-manager reads first: what this asset IS, the one thing that matters most, the financing/buyer reality, and the disposition path with the number. Decisive, specific, no hedging. Like 'This is an occupied post-foreclosure 2/1 that won't pass financing as-is; the real buyer is a cash investor at ~$235k, and the $375k retail only exists after a full rehab. Resolve the redemption right and dispose to the investor lane.'" },
     marketRead: { type: "string", description: "3-6 sentences: market type + proof stat; place THIS reconciled subject in it; the single loudest finding; the directional call + financing reality + tier; where the field override sits. Every sentence does the math and says what it means." },
-    redFlags: { type: "array", items: { type: "string" }, description: "Only EARNED flags, each '[CRITICAL|ADVISORY] category — one sentence'. Empty only after the scan genuinely found none." },
+    redFlags: {
+      type: "array",
+      description: "Only EARNED flags. Empty only after the scan genuinely found none.",
+      items: {
+        type: "object",
+        properties: {
+          severity: { type: "string", enum: ["CRITICAL", "ADVISORY"], description: "CRITICAL or ADVISORY." },
+          category: { type: "string", description: "Short category, e.g. 'Foreclosure / redemption', 'Condition / financing', 'Bed/bath', 'Value gap'." },
+          finding: { type: "string", description: "One specific sentence with the so-what." },
+        },
+        required: ["severity", "category", "finding"],
+      },
+    },
     conditionToValue: { type: "string", description: "The condition → financing → buyer pool → tier chain for THIS property, with numbers." },
     trueBeds: { type: "number", description: "Reconciled bed count (field/room-list wins over tax header)." },
     trueBaths: { type: "number", description: "Reconciled bath count." },
@@ -50,7 +70,7 @@ const SCHEMA = {
     dispositionCall: { type: "string", description: "Directional call + paths (as-is / repair-and-list / quick sale) with the math." },
     excludedComps: { type: "array", items: { type: "string" }, description: "Comps excluded as anchors + why (auction, non-arm's-length, condition-mismatch, outlier). Empty if none." },
   },
-  required: ["verdictLine", "riskGrade", "riskLabel", "marketRead", "redFlags", "conditionToValue", "buyerPool", "subjectTier", "dispositionCall"],
+  required: ["verdictLine", "riskGrade", "riskLabel", "bottomLine", "marketRead", "redFlags", "conditionToValue", "buyerPool", "subjectTier", "dispositionCall"],
 } as const;
 
 export function hasAnalysisKey(): boolean {
@@ -79,12 +99,23 @@ export async function runAnalysis(payload: Record<string, unknown>): Promise<Rep
   const d = tool.input as Partial<ReportAnalysis>;
   const num = (v: unknown): number | null => (typeof v === "number" && isFinite(v) ? v : null);
   const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : []);
+  const flags: RedFlag[] = Array.isArray(d.redFlags)
+    ? (d.redFlags as unknown[])
+        .map((f) => (f ?? {}) as Partial<RedFlag>)
+        .filter((f) => typeof f.finding === "string" && f.finding.trim())
+        .map((f) => ({
+          severity: /crit/i.test(String(f.severity)) ? "CRITICAL" : "ADVISORY",
+          category: String(f.category ?? "").trim() || "Finding",
+          finding: String(f.finding).trim(),
+        }))
+    : [];
   return {
     verdictLine: d.verdictLine ?? "",
     riskGrade: d.riskGrade ?? "",
     riskLabel: d.riskLabel ?? "",
+    bottomLine: d.bottomLine ?? "",
     marketRead: d.marketRead ?? "",
-    redFlags: strs(d.redFlags),
+    redFlags: flags,
     conditionToValue: d.conditionToValue ?? "",
     trueBeds: num(d.trueBeds),
     trueBaths: num(d.trueBaths),

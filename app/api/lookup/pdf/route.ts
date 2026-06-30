@@ -310,8 +310,8 @@ export async function POST(req: NextRequest) {
   const vGradeDesc = analysis?.riskLabel || report.gradeDescriptor;
   const vRatingLine = analysis?.verdictLine || report.ratingLine;
   const vRatingColor = analysis?.riskGrade ? gradeColor(analysis.riskGrade) : RATING_COLOR[report.rating];
-  const vCrit = analysis ? analysis.redFlags.filter((f) => /critical/i.test(f)).length : report.criticalCount;
-  const vAdv = analysis ? analysis.redFlags.filter((f) => /advisor/i.test(f)).length : report.advisoryCount;
+  const vCrit = analysis ? analysis.redFlags.filter((f) => f.severity === "CRITICAL").length : report.criticalCount;
+  const vAdv = analysis ? analysis.redFlags.filter((f) => f.severity !== "CRITICAL").length : report.advisoryCount;
   // Suggested list must match the engine's tier — a distressed/not-financeable
   // subject lists in its as-is range, NOT at the retail ARV top.
   const vSuggestedList = analysis
@@ -386,30 +386,56 @@ export async function POST(req: NextRequest) {
   for (const l of wrap(intel.absorption.ratioLine, font, 6, halfW - 16).slice(0, 1)) ctx.page.drawText(l, { x: ax + 8, y: vTop - 41, size: 6, font, color: SLATE });
   ctx.y = vTop - 56;
 
-  // RED FLAGS — the "hey, look at this", surfaced prominently and never buried
+  // BOTTOM LINE — the plain-English wrap the lender reads first
+  if (analysis?.bottomLine) {
+    ensure(ctx, 22);
+    const blTop = ctx.y;
+    const blLines = wrap(analysis.bottomLine, font, 8.5, CONTENT_W - 16);
+    const blH = 16 + blLines.length * 11;
+    ctx.page.drawRectangle({ x: MARGIN, y: blTop - blH, width: CONTENT_W, height: blH, color: rgb(0.96, 0.97, 0.99), borderColor: NAVY, borderWidth: 0.75 });
+    ctx.page.drawText("BOTTOM LINE", { x: MARGIN + 8, y: blTop - 11, size: 8, font: bold, color: NAVY });
+    let by = blTop - 24;
+    for (const l of blLines) {
+      ctx.page.drawText(l, { x: MARGIN + 8, y: by, size: 8.5, font, color: rgb(0.15, 0.18, 0.25) });
+      by -= 11;
+    }
+    ctx.y = blTop - blH - 8;
+  }
+
+  // RED FLAGS — SEV · CATEGORY · FINDING table, surfaced prominently
   if (analysis && analysis.redFlags.length > 0) {
     ensure(ctx, 16);
-    const rfTop = ctx.y;
-    const rfH = 13 + analysis.redFlags.reduce((h, f) => h + Math.max(1, wrap(`• ${f}`, font, 8, CONTENT_W - 16).length) * 10, 0);
-    ctx.page.drawRectangle({ x: MARGIN, y: rfTop - rfH, width: CONTENT_W, height: rfH, color: rgb(0.99, 0.95, 0.95), borderColor: rgb(0.85, 0.4, 0.4), borderWidth: 0.75 });
-    ctx.page.drawText(`RED FLAGS (${analysis.redFlags.length})`, { x: MARGIN + 8, y: rfTop - 11, size: 8, font: bold, color: RED });
-    ctx.y = rfTop - 20;
-    for (const flag of analysis.redFlags) {
-      for (const [i, l] of wrap(`• ${flag}`, font, 8, CONTENT_W - 16).entries()) {
-        ensure(ctx, 10);
-        ctx.page.drawText(l, { x: MARGIN + 8, y: ctx.y, size: 8, font, color: rgb(0.45, 0.12, 0.12) });
-        ctx.y -= 10;
-      }
+    text(ctx, `RED FLAGS — ${vCrit} critical · ${vAdv} advisory`, { size: 9, font: bold, color: RED, gap: 3 });
+    const sevW = 40;
+    const catW = 118;
+    const findX = MARGIN + sevW + catW;
+    for (const f of analysis.redFlags) {
+      const catLines = wrap(f.category, bold, 8, catW - 6);
+      const findLines = wrap(f.finding, font, 8, CONTENT_W - sevW - catW);
+      const rowH = Math.max(catLines.length, findLines.length, 1) * 10 + 4;
+      ensure(ctx, rowH);
+      const rowTop = ctx.y;
+      const sevColor = f.severity === "CRITICAL" ? RED : rgb(0.72, 0.45, 0.05);
+      ctx.page.drawText(f.severity === "CRITICAL" ? "CRIT" : "ADV", { x: MARGIN, y: rowTop - 8, size: 7, font: bold, color: sevColor });
+      catLines.forEach((l, i) => ctx.page.drawText(l, { x: MARGIN + sevW, y: rowTop - 8 - i * 10, size: 8, font: bold, color: SLATE }));
+      findLines.forEach((l, i) => ctx.page.drawText(l, { x: findX, y: rowTop - 8 - i * 10, size: 8, font, color: rgb(0.3, 0.3, 0.3) }));
+      ctx.y = rowTop - rowH;
     }
     ctx.y -= 6;
   }
 
-  // MARKET READ — the synthesis (forest first), near the top
+  // MARKET READ — the market synthesis
   if (analysis?.marketRead) {
     ensure(ctx, 14);
     text(ctx, "MARKET READ", { size: 9, font: bold, color: NAVY, gap: 2 });
-    text(ctx, analysis.marketRead, { size: 8.5, gap: 3 });
-    if (analysis.dispositionCall) text(ctx, analysis.dispositionCall, { size: 8.5, color: rgb(0.07, 0.4, 0.3), gap: 6 });
+    text(ctx, analysis.marketRead, { size: 8.5, gap: 5 });
+  }
+
+  // DISPOSITION — the specific call, with dollars
+  if (analysis?.dispositionCall) {
+    ensure(ctx, 14);
+    text(ctx, "DISPOSITION", { size: 9, font: bold, color: rgb(0.07, 0.4, 0.3), gap: 2 });
+    text(ctx, analysis.dispositionCall, { size: 8.5, color: rgb(0.1, 0.3, 0.22), gap: 6 });
   }
 
   // REAL MARKET callout (v1.1 page-1 differentiator)
