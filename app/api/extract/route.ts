@@ -266,6 +266,8 @@ export async function POST(req: NextRequest) {
   }
 
   const intel = analyzeMarket(subject, comps, false);
+  // Surface Rentcast rent (the "community report" rent) when the docs didn't carry it.
+  if (rc?.rent && !intel.rent) intel.rent = rc.rent;
 
   // The agent's read (recommended price / strategy / comments), if saved.
   let fieldData: Record<string, unknown> | null = null;

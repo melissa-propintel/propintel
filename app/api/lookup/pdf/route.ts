@@ -10,6 +10,7 @@ import { buildMarketReport, type RiskRating } from "@/lib/market-report";
 import { REQUIRED_SHOTS } from "@/lib/photo-shots";
 import { fetchOrderPhotos, fetchCondition, saveCondition } from "@/lib/order-photos";
 import { assessCondition, hasAnthropicKey, type ConditionAssessment } from "@/lib/condition";
+import { runAnalysis, hasAnalysisKey, type ReportAnalysis } from "@/lib/analysis";
 import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
 
 export const runtime = "nodejs";
@@ -211,6 +212,48 @@ export async function POST(req: NextRequest) {
   const asIsHigh =
     arvHigh != null && repairLow != null ? Math.max(0, arvHigh - repairLow) : arvHigh;
 
+  // ANALYSIS ENGINE — interpret everything (red flags, market read, condition->value,
+  // a defensible as-is/repaired call that reflects the real buyer pool).
+  let analysis: ReportAnalysis | null = null;
+  if (hasAnalysisKey()) {
+    try {
+      analysis = await runAnalysis({
+        subject: {
+          address: s.address, city: s.city, state: s.state, zip: s.zip, county: s.county,
+          propertyType: s.propertyType, yearBuilt: s.yearBuilt, beds: s.beds, baths: s.baths, sqft: s.sqft, lotSize: s.lotSize,
+          ownerNames: s.ownerNames, ownerType: s.ownerType, ownerOccupied: s.ownerOccupied,
+          lastSaleDate: s.lastSaleDate, lastSalePrice: s.lastSalePrice, taxAssessedValue: s.taxAssessedValue,
+          saleHistory: s.saleHistory,
+        },
+        comps: (intel.comps ?? []).slice(0, 30).map((c) => ({
+          address: c.address, status: c.status, price: c.price, soldDate: c.soldDate, listedDate: c.listedDate,
+          daysOnMarket: c.daysOnMarket, beds: c.beds, baths: c.baths, sqft: c.sqft, distanceMiles: c.distanceMiles,
+        })),
+        absorption: intel.absorption,
+        compValueRange: intel.valueRange,
+        compAsIs: { low: intel.valueRange.asIsLow, high: intel.valueRange.asIsHigh },
+        compRepaired: { low: intel.valueRange.renovatedLow, high: intel.valueRange.renovatedHigh },
+        rent: intel.rent,
+        condition: condition
+          ? { grade: condition.grade, gradeLabel: condition.gradeLabel, habitability: condition.habitability,
+              exterior: condition.exterior, interior: condition.interior, damage: condition.damage, summary: condition.summary,
+              repairs: condition.repairs, repairTotalLow: condition.repairTotalLow, repairTotalHigh: condition.repairTotalHigh }
+          : null,
+        fieldNotes: meta.agentRead ?? null,
+      });
+    } catch {
+      analysis = null;
+    }
+  }
+
+  // Prefer the engine's value call (it applies the condition->buyer-pool discount);
+  // fall back to the ARV-minus-repairs arithmetic.
+  const vAsIsLow = analysis?.asIsLow ?? asIsLow;
+  const vAsIsHigh = analysis?.asIsHigh ?? asIsHigh;
+  const vRepLow = analysis?.repairedLow ?? arvLow;
+  const vRepHigh = analysis?.repairedHigh ?? arvHigh;
+  const showAsIs = hasRepairs || analysis?.asIsLow != null;
+
   const doc = await PDFDocument.create();
   const font = await doc.embedFont(StandardFonts.Helvetica);
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
@@ -300,12 +343,11 @@ export async function POST(req: NextRequest) {
   const halfW = (CONTENT_W - 10) / 2;
   const oversupplied = intel.absorption.level === "SEVERE" || intel.absorption.level === "OVERSUPPLIED";
   ctx.page.drawRectangle({ x: MARGIN, y: vTop - 46, width: halfW, height: 46, borderColor: rgb(0.85, 0.87, 0.9), borderWidth: 0.75 });
-  if (hasRepairs) {
-    // Condition-adjusted: lead with As-Is, show Repaired/ARV less repairs underneath.
+  if (showAsIs) {
+    // Condition-adjusted: lead with As-Is, show Repaired/ARV underneath.
     ctx.page.drawText("AS-IS VALUE (CONDITION-ADJUSTED)", { x: MARGIN + 8, y: vTop - 13, size: 6, font: bold, color: rgb(0.55, 0.32, 0.02) });
-    ctx.page.drawText(`${usd(asIsLow)} – ${usd(asIsHigh)}`, { x: MARGIN + 8, y: vTop - 31, size: 15, font: bold, color: NAVY });
-    const repairMid = repairHigh ?? repairLow;
-    ctx.page.drawText(`Repaired/ARV ${usd(arvLow)}–${usd(arvHigh)} less repairs ~${usd(repairLow)}–${usd(repairHigh ?? repairMid)}`, { x: MARGIN + 8, y: vTop - 41, size: 6, font, color: LIGHT });
+    ctx.page.drawText(`${usd(vAsIsLow)} – ${usd(vAsIsHigh)}`, { x: MARGIN + 8, y: vTop - 31, size: 15, font: bold, color: NAVY });
+    ctx.page.drawText(`Repaired / ARV ${usd(vRepLow)} – ${usd(vRepHigh)}${hasRepairs ? `  ·  repairs ~${usd(repairLow)}–${usd(repairHigh)}` : ""}`, { x: MARGIN + 8, y: vTop - 41, size: 6, font, color: LIGHT });
   } else {
     ctx.page.drawText(report.mlsRequired ? "PRELIMINARY VALUE (UNVERIFIED)" : "INDICATED AS-IS VALUE RANGE", { x: MARGIN + 8, y: vTop - 13, size: 6, font: bold, color: report.mlsRequired ? rgb(0.55, 0.32, 0.02) : LIGHT });
     ctx.page.drawText(`${usd(intel.valueRange.low)} – ${usd(intel.valueRange.high)}`, { x: MARGIN + 8, y: vTop - 31, size: 15, font: bold, color: NAVY });
@@ -318,6 +360,32 @@ export async function POST(req: NextRequest) {
   ctx.page.drawText(mos, { x: ax + 8, y: vTop - 31, size: 15, font: bold, color: oversupplied ? RED : NAVY });
   for (const l of wrap(intel.absorption.ratioLine, font, 6, halfW - 16).slice(0, 1)) ctx.page.drawText(l, { x: ax + 8, y: vTop - 41, size: 6, font, color: SLATE });
   ctx.y = vTop - 56;
+
+  // RED FLAGS — the "hey, look at this", surfaced prominently and never buried
+  if (analysis && analysis.redFlags.length > 0) {
+    ensure(ctx, 16);
+    const rfTop = ctx.y;
+    const rfH = 13 + analysis.redFlags.reduce((h, f) => h + Math.max(1, wrap(`• ${f}`, font, 8, CONTENT_W - 16).length) * 10, 0);
+    ctx.page.drawRectangle({ x: MARGIN, y: rfTop - rfH, width: CONTENT_W, height: rfH, color: rgb(0.99, 0.95, 0.95), borderColor: rgb(0.85, 0.4, 0.4), borderWidth: 0.75 });
+    ctx.page.drawText(`RED FLAGS (${analysis.redFlags.length})`, { x: MARGIN + 8, y: rfTop - 11, size: 8, font: bold, color: RED });
+    ctx.y = rfTop - 20;
+    for (const flag of analysis.redFlags) {
+      for (const [i, l] of wrap(`• ${flag}`, font, 8, CONTENT_W - 16).entries()) {
+        ensure(ctx, 10);
+        ctx.page.drawText(l, { x: MARGIN + 8, y: ctx.y, size: 8, font, color: rgb(0.45, 0.12, 0.12) });
+        ctx.y -= 10;
+      }
+    }
+    ctx.y -= 6;
+  }
+
+  // MARKET READ — the synthesis (forest first), near the top
+  if (analysis?.marketRead) {
+    ensure(ctx, 14);
+    text(ctx, "MARKET READ", { size: 9, font: bold, color: NAVY, gap: 2 });
+    text(ctx, analysis.marketRead, { size: 8.5, gap: 3 });
+    if (analysis.dispositionCall) text(ctx, analysis.dispositionCall, { size: 8.5, color: rgb(0.07, 0.4, 0.3), gap: 6 });
+  }
 
   // REAL MARKET callout (v1.1 page-1 differentiator)
   ensure(ctx, 30);
@@ -561,6 +629,10 @@ export async function POST(req: NextRequest) {
       ensure(ctx, 22);
       text(ctx, `Estimated repairs: ${usd(repairLow)} – ${usd(repairHigh)}`, { size: 8.5, font: bold, color: rgb(0.55, 0.32, 0.02), gap: 1 });
       text(ctx, `Repaired / ARV value ${usd(arvLow)} – ${usd(arvHigh)}   less repairs   =   As-is value ${usd(asIsLow)} – ${usd(asIsHigh)}`, { size: 8.5, font: bold, color: NAVY, gap: 3 });
+    }
+    if (analysis?.conditionToValue) {
+      ctx.y -= 2;
+      text(ctx, analysis.conditionToValue, { size: 8.5, gap: 3 });
     }
     text(ctx, `Assessed from ${condition.photoCount} field photo${condition.photoCount === 1 ? "" : "s"} by PropIntel's vision review.`, { size: 7, color: LIGHT, gap: 8 });
   } else {
