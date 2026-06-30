@@ -425,11 +425,26 @@ export async function POST(req: NextRequest) {
   // KEY NUMBERS — dense two-column block
   text(ctx, "KEY NUMBERS", { size: 9, font: bold, color: NAVY, gap: 3 });
   {
+    // Replace the comp engine's wide/blended value lines with the value engine's
+    // TIGHT as-is + ARV (a value, not the 200-home spread); fix beds/baths to the
+    // reconciled count; align suggested list to the tier.
+    let keyNumbers = report.keyNumbers;
+    if (analysis) {
+      const ov: Record<string, string> = {};
+      if (vAsIsLow != null) ov["As-is / distressed value"] = `${usd(vAsIsLow)} – ${usd(vAsIsHigh)}`;
+      if (vRepLow != null) ov["Renovated / retail value"] = `${usd(vRepLow)} – ${usd(vRepHigh)}`;
+      ov["Suggested list price"] = usd(vSuggestedList);
+      if (analysis.trueBeds != null || analysis.trueBaths != null)
+        ov["Beds / baths"] = `${analysis.trueBeds ?? "—"} / ${analysis.trueBaths ?? "—"}`;
+      keyNumbers = report.keyNumbers
+        .filter((f) => f.label !== "Indicated value (blended)")
+        .map((f) => (ov[f.label] != null ? { ...f, value: ov[f.label] } : f));
+    }
     const colGap = 12;
     const colW2 = (CONTENT_W - colGap) / 2;
-    const rows = Math.ceil(report.keyNumbers.length / 2);
+    const rows = Math.ceil(keyNumbers.length / 2);
     const kTop = ctx.y;
-    report.keyNumbers.forEach((f, i) => {
+    keyNumbers.forEach((f, i) => {
       const col = Math.floor(i / rows);
       const rowi = i % rows;
       const x = MARGIN + col * (colW2 + colGap);
