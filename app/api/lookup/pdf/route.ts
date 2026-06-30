@@ -8,7 +8,7 @@ import { PDFDocument, StandardFonts, rgb, PDFPage, PDFFont, RGB } from "pdf-lib"
 import type { MarketIntel } from "@/lib/market-data";
 import { buildMarketReport, type RiskRating } from "@/lib/market-report";
 import { REQUIRED_SHOTS } from "@/lib/photo-shots";
-import { fetchOrderPhotos, fetchCondition, saveCondition } from "@/lib/order-photos";
+import { fetchOrderPhotos, fetchCondition, saveCondition, fetchOrderDocsText } from "@/lib/order-photos";
 import { assessCondition, hasAnthropicKey, type ConditionAssessment } from "@/lib/condition";
 import { runAnalysis, hasAnalysisKey, type ReportAnalysis } from "@/lib/analysis";
 import { DISCLAIMER, TAGLINE } from "@/lib/report-standard";
@@ -216,8 +216,10 @@ export async function POST(req: NextRequest) {
   // a defensible as-is/repaired call that reflects the real buyer pool).
   let analysis: ReportAnalysis | null = null;
   if (hasAnalysisKey()) {
+    const sourceDocs = meta.orderNumber ? await fetchOrderDocsText(meta.orderNumber) : "";
     try {
       analysis = await runAnalysis({
+        sourceDocsText: sourceDocs || undefined,
         subject: {
           address: s.address, city: s.city, state: s.state, zip: s.zip, county: s.county,
           propertyType: s.propertyType, yearBuilt: s.yearBuilt, beds: s.beds, baths: s.baths, sqft: s.sqft, lotSize: s.lotSize,
@@ -239,7 +241,14 @@ export async function POST(req: NextRequest) {
               exterior: condition.exterior, interior: condition.interior, damage: condition.damage, summary: condition.summary,
               repairs: condition.repairs, repairTotalLow: condition.repairTotalLow, repairTotalHigh: condition.repairTotalHigh }
           : null,
-        fieldNotes: meta.agentRead ?? null,
+        fieldAgentRead: meta.agentRead
+          ? {
+              recommendedPrice: meta.agentRead.recommendedPrice ?? null,
+              strategy: meta.agentRead.strategy ?? null,
+              areaComparison: meta.agentRead.areaComparison ?? null,
+              comments: meta.agentRead.comments ?? null,
+            }
+          : null,
       });
     } catch {
       analysis = null;
@@ -295,14 +304,23 @@ export async function POST(req: NextRequest) {
     ctx.y = pTop - 44;
   }
 
+  // Verdict overrides from the value engine (Rule 6: grade DERIVED from value+flags).
+  const gradeColor = (g: string) => (g === "A" || g === "B" ? rgb(0.13, 0.5, 0.33) : g === "C" ? rgb(0.72, 0.45, 0.05) : rgb(0.6, 0.15, 0.15));
+  const vGrade = analysis?.riskGrade || report.gradeLetter;
+  const vGradeDesc = analysis?.riskLabel || report.gradeDescriptor;
+  const vRatingLine = analysis?.verdictLine || report.ratingLine;
+  const vRatingColor = analysis?.riskGrade ? gradeColor(analysis.riskGrade) : RATING_COLOR[report.rating];
+  const vCrit = analysis ? analysis.redFlags.filter((f) => /critical/i.test(f)).length : report.criticalCount;
+  const vAdv = analysis ? analysis.redFlags.filter((f) => /advisor/i.test(f)).length : report.advisoryCount;
+
   // Rating banner — letter grade + descriptor (v1.1)
   ensure(ctx, 46);
   const bTop = ctx.y;
-  ctx.page.drawRectangle({ x: MARGIN, y: bTop - 44, width: CONTENT_W, height: 44, color: RATING_COLOR[report.rating] });
+  ctx.page.drawRectangle({ x: MARGIN, y: bTop - 44, width: CONTENT_W, height: 44, color: vRatingColor });
   ctx.page.drawText("OVERALL RISK", { x: MARGIN + 10, y: bTop - 14, size: 7, font: bold, color: rgb(1, 1, 1) });
-  ctx.page.drawText(`${report.gradeLetter} — ${report.gradeDescriptor}`, { x: MARGIN + 10, y: bTop - 33, size: 17, font: bold, color: WHITE });
+  ctx.page.drawText(`${vGrade} — ${vGradeDesc}`, { x: MARGIN + 10, y: bTop - 33, size: 17, font: bold, color: WHITE });
   let ry = bTop - 13;
-  for (const l of wrap(report.ratingLine, font, 7.5, 230).slice(0, 3)) {
+  for (const l of wrap(vRatingLine, font, 7.5, 230).slice(0, 3)) {
     ctx.page.drawText(l, { x: PAGE_W - MARGIN - 240, y: ry, size: 7.5, font, color: rgb(0.92, 0.97, 0.95) });
     ry -= 10;
   }
@@ -315,14 +333,14 @@ export async function POST(req: NextRequest) {
         ["SALEABILITY", report.saleability],
         ["CONDITION", condition?.grade ?? "Field"],
         ["ABSORPTION", intel.absorption.level],
-        ["RED FLAGS", `${report.criticalCount}C · ${report.advisoryCount}A`],
+        ["RED FLAGS", `${vCrit}C · ${vAdv}A`],
       ]
     : [
         ["SALEABILITY", report.saleability],
         ["SUGGESTED LIST", usd(report.suggestedListPrice)],
         ["CONDITION", condition?.grade ?? "Field"],
         ["ABSORPTION", intel.absorption.level],
-        ["RED FLAGS", `${report.criticalCount}C · ${report.advisoryCount}A`],
+        ["RED FLAGS", `${vCrit}C · ${vAdv}A`],
       ];
   ensure(ctx, 34);
   const cellW = CONTENT_W / grades.length;

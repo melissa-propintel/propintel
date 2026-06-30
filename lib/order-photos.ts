@@ -47,6 +47,47 @@ export async function saveCondition(orderId: string, assessment: ConditionAssess
     .upload(`${safeFolder(orderId)}/_condition.json`, new Blob([JSON.stringify(assessment)], { type: "application/json" }), { upsert: true });
 }
 
+/** Read the order's uploaded MLS / CRS / tax docs as text so the value engine can
+ *  scan for distress signals (foreclosure, redemption, As-Is, room-list bed count). */
+export async function fetchOrderDocsText(orderId: string, maxChars = 60000): Promise<string> {
+  const supabase = client();
+  if (!supabase || !orderId) return "";
+  const folder = `${safeFolder(orderId)}/docs`;
+  try {
+    const { data: files } = await supabase.storage.from(PHOTO_BUCKET).list(folder, { limit: 60 });
+    const docs = (files ?? []).filter((f) => f.name && !f.name.startsWith("_") && !f.name.endsWith(".json"));
+    if (docs.length === 0) return "";
+    const { extractText, getDocumentProxy } = await import("unpdf");
+    const chunks: string[] = [];
+    for (const f of docs) {
+      const { data: blob } = await supabase.storage.from(PHOTO_BUCKET).download(`${folder}/${f.name}`);
+      if (!blob) continue;
+      const lower = f.name.toLowerCase();
+      let text = "";
+      if (lower.endsWith(".pdf")) {
+        try {
+          const buf = new Uint8Array(await blob.arrayBuffer());
+          const pdf = await getDocumentProxy(buf);
+          const res = await extractText(pdf, { mergePages: true });
+          text = (Array.isArray(res.text) ? res.text.join("\n") : res.text) ?? "";
+        } catch {
+          text = "";
+        }
+      } else if (lower.endsWith(".csv") || lower.endsWith(".txt")) {
+        try {
+          text = await blob.text();
+        } catch {
+          text = "";
+        }
+      }
+      if (text && text.trim()) chunks.push(`--- ${f.name} ---\n${text.trim()}`);
+    }
+    return chunks.join("\n").slice(0, maxChars);
+  } catch {
+    return "";
+  }
+}
+
 export async function fetchOrderPhotos(orderId: string): Promise<OrderPhoto[]> {
   const supabase = client();
   if (!supabase || !orderId) return [];
