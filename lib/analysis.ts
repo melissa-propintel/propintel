@@ -72,7 +72,7 @@ const SCHEMA = {
     repairedHigh: { type: "number" },
     spread: { type: "number", description: "Repaired center − as-is center, dollars (the rehab opportunity/risk)." },
     dispositionCall: { type: "string", description: "The value paths as FACTUAL ECONOMICS with numbers — NO directives, no 'list at'/'do not list'. As-is cash-investor range; repair-and-list (repaired ceiling, rehab budget, net-to-retail math); wholesale floor. Present each path's economics; the client decides." },
-    competition: { type: "string", description: "The subject's biggest competition, as a FACT: the comparable inventory it competes with at resale (e.g. 'renovated 3/2s at $390-435k; 18 sold in 6 mo') — what the buyer/seller is up against." },
+    competition: { type: "string", description: "Whether competing inventory makes the subject HARD TO SELL — the COUNT of comparable competing listings and especially how many are REO/distressed/as-is (a glut of distressed/REO competition pressures price + slows the sale; thin competition helps). Counts + character, e.g. '13 active competitors, 4 REO/as-is — heavy distressed field' or 'only 2 competing as-is listings'." },
     biggestObstacle: { type: "string", description: "The single biggest obstacle, as a FACT (e.g. the active redemption right / title path)." },
     biggestRisk: { type: "string", description: "The single biggest risk, as a FACT (e.g. unknown basement scope drives the rehab budget)." },
     areaDifference: { type: "string", description: "What makes THIS home / area different, factually — the submarket's character, demand, price tier, absorption (why buyers pay here). Not people." },
