@@ -11,6 +11,7 @@ import {
   type OrderStatus,
 } from "@/lib/orders";
 import { priceFor, usd } from "@/lib/pricing";
+import { makeToken, uploadReport, createDelivery } from "@/lib/deliveries";
 
 const APP = "https://propintelreport.com";
 
@@ -45,6 +46,8 @@ export default function WorkOrderPage() {
   const [downloading, setDownloading] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const [reportType, setReportType] = useState(REPORT_TYPES[0]);
+  const [delivering, setDelivering] = useState(false);
+  const [deliveredLink, setDeliveredLink] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [intel, setIntel] = useState<unknown | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -144,6 +147,45 @@ export default function WorkOrderPage() {
       return;
     }
     setErr(data.error || "Payments aren't set up yet — the order is saved; you can invoice it.");
+  }
+
+  async function deliverToClient() {
+    if (!order || !intel) {
+      setErr("Build the report first.");
+      return;
+    }
+    if (!order.paid) {
+      setErr("This order isn't paid yet — take payment or send an invoice before delivering.");
+      return;
+    }
+    setDelivering(true);
+    setErr(null);
+    try {
+      const res = await fetch("/api/lookup/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intel, meta: { orderNumber, clientName: order.client_name, serviceLineLabel: reportType, agentRead: field ?? undefined } }),
+      });
+      if (!res.ok) throw new Error("Couldn't build the report PDF.");
+      const blob = await res.blob();
+      const token = makeToken();
+      const item = await uploadReport(token, 0, order.property_address, blob, { valueLow: v?.valueRange?.low, valueHigh: v?.valueRange?.high });
+      await createDelivery(token, order.client_name, [item]);
+      await updateOrder(order.id, { status: "delivered" });
+      setOrder((o) => (o ? { ...o, status: "delivered" } : o));
+      if (order.customer_email) {
+        fetch("/api/deliver-email", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ to: order.customer_email, token, address: order.property_address, orderNumber }),
+        }).catch(() => {});
+      }
+      setDeliveredLink(`${APP}/d/${token}`);
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : "Delivery failed.");
+    } finally {
+      setDelivering(false);
+    }
   }
 
   async function sendInvoice() {
@@ -286,6 +328,27 @@ export default function WorkOrderPage() {
                 {downloading ? "Building report… (10–30s)" : downloaded ? "Downloaded ✓ — check your Downloads" : "Download report PDF"}
               </button>
               {downloading && <span className="ml-3 text-sm text-pi-green-deep">Running condition + value engine…</span>}
+
+              {/* Deliver to the client — payment-gated */}
+              <div className="mt-3 border-t border-pi-border pt-3">
+                {order?.paid ? (
+                  <button
+                    onClick={deliverToClient}
+                    disabled={delivering}
+                    className="rounded-lg bg-pi-green-deep px-5 py-2.5 text-sm font-semibold text-white hover:bg-pi-navy-soft transition disabled:opacity-60"
+                  >
+                    {delivering ? "Delivering…" : "Deliver to client"}
+                  </button>
+                ) : (
+                  <p className="text-sm text-amber-700">🔒 Paid orders only — take payment or send an invoice above to deliver the report to the client.</p>
+                )}
+                {deliveredLink && (
+                  <p className="mt-2 text-sm text-emerald-700">
+                    Delivered ✓ {order?.customer_email ? `— emailed to ${order.customer_email}` : ""} · client link:{" "}
+                    <a href={deliveredLink} target="_blank" rel="noopener noreferrer" className="underline">{deliveredLink}</a>
+                  </p>
+                )}
+              </div>
             </div>
           )}
         </section>
