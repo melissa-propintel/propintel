@@ -21,6 +21,8 @@ export default function Home() {
       {/* 1 — HERO */}
       <section className="px-6 py-20 text-center">
         <div className="mx-auto max-w-3xl">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/propintel-logo.svg" alt="PropIntel" className="mx-auto mb-8 h-28 w-auto sm:h-32" />
           <span className="inline-block rounded-full bg-pi-green-pale px-3 py-1 text-[11px] font-medium uppercase tracking-[0.12em] text-pi-amber-text">
             Property intelligence for lenders · investors · asset managers
           </span>
@@ -33,7 +35,7 @@ export default function Home() {
             already use.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
-            <Link href="/login?mode=signup" className={primaryBtn}>
+            <Link href="/order" className={primaryBtn}>
               Order a report
             </Link>
             <SampleButton className={outlineBtn}>Get a sample</SampleButton>
@@ -120,6 +122,39 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* 4b — PRICING */}
+      <section id="pricing" className="bg-pi-cream px-6 py-16">
+        <div className="mx-auto max-w-5xl text-center">
+          <h2 className="text-2xl font-medium text-pi-green-dark">Simple, honest pricing</h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-relaxed text-pi-slate-mid">
+            Better than a BPO — for about the same price. Volume rates for portfolios.
+          </p>
+          <div className="mt-10 grid grid-cols-1 gap-5 sm:grid-cols-3">
+            {[
+              { name: "Desktop", price: "$89", blurb: "You upload MLS / comps / tax. Auto-generated in minutes.", feat: ["Value engine + condition read", "Red flags + market analysis", "As-is and repaired value"] },
+              { name: "Field — Lite", price: "$150", blurb: "An agent does an exterior / drive-by inspection.", feat: ["Everything in Desktop", "On-site exterior photos", "Field-verified condition"], featured: true },
+              { name: "Field — Full", price: "$210", blurb: "Full interior + exterior inspection.", feat: ["Everything in Lite", "Interior condition + repairs", "Occupancy + access"] },
+            ].map((p) => (
+              <div key={p.name} className={`rounded-2xl border bg-white p-6 text-left ${p.featured ? "border-pi-green-deep ring-1 ring-pi-green-deep" : "border-pi-border"}`}>
+                {p.featured && <span className="mb-2 inline-block rounded-full bg-pi-green-pale px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-pi-amber-text">Most popular</span>}
+                <p className="text-sm font-semibold text-pi-green-dark">{p.name}</p>
+                <p className="mt-1 text-3xl font-bold text-pi-green-deep">{p.price}</p>
+                <p className="mt-2 text-xs leading-relaxed text-pi-slate-mid">{p.blurb}</p>
+                <ul className="mt-4 space-y-1.5 text-sm text-pi-slate-mid">
+                  {p.feat.map((f) => <li key={f}>✓ {f}</li>)}
+                </ul>
+              </div>
+            ))}
+          </div>
+          <p className="mt-6 text-sm text-pi-slate-mid">
+            <strong className="text-pi-green-dark">Portfolios:</strong> volume rates from $59 (100+) down to $45 (500+) per desktop report, billed net-30.
+          </p>
+          <Link href="/order" className="mt-6 inline-block rounded-lg bg-pi-green-deep px-7 py-3 text-sm font-medium text-white transition hover:bg-pi-navy-soft">
+            Order a report
+          </Link>
         </div>
       </section>
 

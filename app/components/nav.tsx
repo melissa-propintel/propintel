@@ -21,7 +21,7 @@ export function Nav({ viewer }: { viewer: Viewer }) {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-2.5">
         <Link href="/" className="flex items-center">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/propintel-logo.svg" alt="PropIntel — Property Intelligence" className="h-12 w-auto" />
+          <img src="/propintel-logo.svg" alt="PropIntel — Property Intelligence" className="h-16 w-auto" />
         </Link>
 
         <nav className="flex items-center gap-4 text-sm">
