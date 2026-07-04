@@ -287,7 +287,33 @@ export async function POST(req: NextRequest) {
   }  ·  Automated market read`;
   text(ctx, metaLine, { size: 8, color: LIGHT });
   text(ctx, s.address, { size: 15, font: bold, color: NAVY });
-  text(ctx, [s.city, s.state, s.zip].filter(Boolean).join(", "), { size: 8, color: SLATE, gap: report.mlsRequired ? 6 : 8 });
+  text(ctx, [s.city, s.state, s.zip].filter(Boolean).join(", "), { size: 8, color: SLATE, gap: 4 });
+
+  // Rich public-record header (reference-report style)
+  if (analysis?.header) {
+    const h = analysis.header;
+    const forec = [h.auctionDate !== "—" ? `auction ${h.auctionDate}` : "", h.filingDate !== "—" ? `filing ${h.filingDate}` : ""].filter(Boolean).join("  ·  ");
+    const hrowsAll: [string, string][] = [
+      ["Parcel ID", h.parcelId],
+      ["Legal", h.legal],
+      ["Owner of record", h.ownerOfRecord],
+      ["Foreclosure", forec || "—"],
+      ["Report · Field agent", `${reportDate}  ·  Alabama Realty Servicing`],
+    ];
+    const hrows = hrowsAll.filter(([, v]) => v && v !== "—");
+    for (const [k, v] of hrows) {
+      ensure(ctx, 9);
+      ctx.page.drawText(`${k}:`, { x: MARGIN, y: ctx.y - 6, size: 7.5, font: bold, color: LIGHT });
+      for (const [i, l] of wrap(v, font, 7.5, CONTENT_W - 112).entries()) {
+        if (i > 0) ensure(ctx, 9);
+        ctx.page.drawText(l, { x: MARGIN + 108, y: ctx.y - 6, size: 7.5, font, color: SLATE });
+        ctx.y -= 9;
+      }
+    }
+    ctx.y -= report.mlsRequired ? 2 : 4;
+  } else {
+    ctx.y -= report.mlsRequired ? 2 : 4;
+  }
 
   // Data-confidence banner — thin/rural or no-record data that needs agent comps.
   if (report.mlsRequired) {
@@ -681,7 +707,42 @@ export async function POST(req: NextRequest) {
   // ===================== TAX RECORD vs REALITY (§3) + PROPERTY + CONDITION =====================
   newPage(ctx, true);
   sectionTitle(ctx, "Tax Record vs. Reality");
-  for (const t of report.taxVsReality) text(ctx, t, { size: 9, gap: 3 });
+  if (analysis) {
+    const tr = analysis.taxRecord;
+    text(ctx, "TAX / PUBLIC RECORD SUMMARY", { size: 9, font: bold, color: NAVY, gap: 2 });
+    const trRowsAll: [string, string][] = [
+      ["Year built", tr.yearBuilt],
+      ["Beds / baths (record)", tr.bedsBaths],
+      ["Square footage", tr.sqft],
+      ["Lot size", tr.lotSize],
+      ["Construction", tr.construction],
+      ["HVAC", tr.hvac],
+      ["Utilities", tr.utilities],
+      ["Zoning", tr.zoning],
+      ["FEMA flood zone", tr.floodZone],
+      ["Tax appraisal", tr.taxAppraisal],
+      ["Assessment", tr.assessment],
+      ["Annual taxes", tr.annualTaxes],
+      ["Payment history", tr.paymentHistory],
+    ];
+    const trRows = trRowsAll.filter(([, v]) => v && v !== "—");
+    for (const [k, v] of trRows) {
+      ensure(ctx, 11);
+      ctx.page.drawText(k, { x: MARGIN, y: ctx.y - 8, size: 8, font, color: LIGHT });
+      for (const [i, l] of wrap(v, font, 8, CONTENT_W - 150).entries()) {
+        if (i > 0) ensure(ctx, 10);
+        ctx.page.drawText(l, { x: MARGIN + 150, y: ctx.y - 8, size: 8, font, color: SLATE });
+        ctx.y -= 10;
+      }
+    }
+    ctx.y -= 4;
+    if (analysis.taxVsReality) {
+      text(ctx, "RECORD vs. REALITY", { size: 9, font: bold, color: NAVY, gap: 2 });
+      text(ctx, analysis.taxVsReality, { size: 9, gap: 4 });
+    }
+  } else {
+    for (const t of report.taxVsReality) text(ctx, t, { size: 9, gap: 3 });
+  }
   ctx.y -= 2;
 
   // §4 OWNERSHIP

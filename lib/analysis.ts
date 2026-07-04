@@ -11,6 +11,30 @@ export interface RedFlag {
   finding: string;
 }
 
+export interface ReportHeader {
+  parcelId: string;
+  legal: string; // subdivision / lot
+  ownerOfRecord: string; // name + location if shown
+  auctionDate: string; // foreclosure auction / sale date
+  filingDate: string; // foreclosure filing date
+}
+
+export interface TaxRecord {
+  yearBuilt: string;
+  bedsBaths: string; // as the tax record shows
+  sqft: string; // breakdown (main + basement) if shown
+  lotSize: string;
+  construction: string; // exterior wall / roof / interior, brief
+  hvac: string;
+  utilities: string;
+  zoning: string;
+  floodZone: string;
+  taxAppraisal: string;
+  assessment: string;
+  annualTaxes: string;
+  paymentHistory: string;
+}
+
 export interface ReportAnalysis {
   verdictLine: string;
   riskGrade: string; // A-F
@@ -35,6 +59,9 @@ export interface ReportAnalysis {
   biggestObstacle: string;
   biggestRisk: string;
   areaDifference: string;
+  header: ReportHeader;
+  taxRecord: TaxRecord;
+  taxVsReality: string;
   excludedComps: string[];
 }
 
@@ -76,9 +103,42 @@ const SCHEMA = {
     biggestObstacle: { type: "string", description: "The single biggest obstacle, as a FACT (e.g. the active redemption right / title path)." },
     biggestRisk: { type: "string", description: "The single biggest risk, as a FACT (e.g. unknown basement scope drives the rehab budget)." },
     areaDifference: { type: "string", description: "What makes THIS home / area different, factually — the submarket's character, demand, price tier, absorption (why buyers pay here). Not people." },
+    header: {
+      type: "object",
+      description: "Public-record header facts pulled from the CRS / tax / MLS docs. Use '—' for anything not shown.",
+      properties: {
+        parcelId: { type: "string", description: "Parcel / tax ID." },
+        legal: { type: "string", description: "Subdivision + lot (legal description)." },
+        ownerOfRecord: { type: "string", description: "Owner of record + location if shown (e.g. 'Wilmington Savings Fund Society FSB Tr')." },
+        auctionDate: { type: "string", description: "Foreclosure auction / sale date." },
+        filingDate: { type: "string", description: "Foreclosure filing date, if shown." },
+      },
+      required: ["parcelId", "legal", "ownerOfRecord", "auctionDate", "filingDate"],
+    },
+    taxRecord: {
+      type: "object",
+      description: "The tax / CRS record summary, extracted from the docs. Use '—' for anything not in the docs; do NOT invent.",
+      properties: {
+        yearBuilt: { type: "string" },
+        bedsBaths: { type: "string", description: "Beds/baths AS THE TAX RECORD shows (may differ from field-verified)." },
+        sqft: { type: "string", description: "Square footage with breakdown (main + basement) if shown." },
+        lotSize: { type: "string" },
+        construction: { type: "string", description: "Exterior wall / roof / interior, brief." },
+        hvac: { type: "string" },
+        utilities: { type: "string" },
+        zoning: { type: "string" },
+        floodZone: { type: "string" },
+        taxAppraisal: { type: "string" },
+        assessment: { type: "string" },
+        annualTaxes: { type: "string" },
+        paymentHistory: { type: "string", description: "Tax payment history / delinquency, if shown." },
+      },
+      required: ["yearBuilt", "bedsBaths", "sqft", "lotSize", "taxAppraisal"],
+    },
+    taxVsReality: { type: "string", description: "The comparison narrative: where the tax/public record MATCHES vs. CONTRADICTS what the field agent + MLS found (beds/baths, sqft, condition), and what that means for value. Cite the specific conflicts (e.g. tax says 3/2, field confirms 2/1; tax finished-basement sqft unverified)." },
     excludedComps: { type: "array", items: { type: "string" }, description: "Comps excluded as anchors + why (auction, non-arm's-length, condition-mismatch, outlier). Empty if none." },
   },
-  required: ["verdictLine", "riskGrade", "riskLabel", "bottomLine", "marketRead", "redFlags", "conditionToValue", "trueBeds", "trueBaths", "buyerPool", "subjectTier", "asIsLow", "asIsHigh", "repairedLow", "repairedHigh", "spread", "dispositionCall", "competition", "biggestObstacle", "biggestRisk", "areaDifference"],
+  required: ["verdictLine", "riskGrade", "riskLabel", "bottomLine", "marketRead", "redFlags", "conditionToValue", "trueBeds", "trueBaths", "buyerPool", "subjectTier", "asIsLow", "asIsHigh", "repairedLow", "repairedHigh", "spread", "dispositionCall", "competition", "biggestObstacle", "biggestRisk", "areaDifference", "header", "taxRecord", "taxVsReality"],
 } as const;
 
 export function hasAnalysisKey(): boolean {
@@ -107,6 +167,9 @@ export async function runAnalysis(payload: Record<string, unknown>): Promise<Rep
   const d = tool.input as Partial<ReportAnalysis>;
   const num = (v: unknown): number | null => (typeof v === "number" && isFinite(v) ? v : null);
   const strs = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x.trim()) : []);
+  const s1 = (v: unknown): string => (typeof v === "string" && v.trim() ? v.trim() : "—");
+  const hd = (d.header ?? {}) as Partial<ReportHeader>;
+  const tx = (d.taxRecord ?? {}) as Partial<TaxRecord>;
   const flags: RedFlag[] = Array.isArray(d.redFlags)
     ? (d.redFlags as unknown[])
         .map((f) => (f ?? {}) as Partial<RedFlag>)
@@ -141,6 +204,17 @@ export async function runAnalysis(payload: Record<string, unknown>): Promise<Rep
     biggestObstacle: d.biggestObstacle ?? "",
     biggestRisk: d.biggestRisk ?? "",
     areaDifference: d.areaDifference ?? "",
+    header: {
+      parcelId: s1(hd.parcelId), legal: s1(hd.legal), ownerOfRecord: s1(hd.ownerOfRecord),
+      auctionDate: s1(hd.auctionDate), filingDate: s1(hd.filingDate),
+    },
+    taxRecord: {
+      yearBuilt: s1(tx.yearBuilt), bedsBaths: s1(tx.bedsBaths), sqft: s1(tx.sqft), lotSize: s1(tx.lotSize),
+      construction: s1(tx.construction), hvac: s1(tx.hvac), utilities: s1(tx.utilities), zoning: s1(tx.zoning),
+      floodZone: s1(tx.floodZone), taxAppraisal: s1(tx.taxAppraisal), assessment: s1(tx.assessment),
+      annualTaxes: s1(tx.annualTaxes), paymentHistory: s1(tx.paymentHistory),
+    },
+    taxVsReality: d.taxVsReality ?? "",
     excludedComps: strs(d.excludedComps),
   };
 }
