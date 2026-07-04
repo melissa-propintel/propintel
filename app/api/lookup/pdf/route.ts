@@ -156,6 +156,7 @@ interface Meta {
   orderNumber?: string;
   serviceLine?: string;
   serviceLineLabel?: string;
+  sourceDocsText?: string; // override — lets a sample generate without a stored order
   testValue?: number | null;
   testLabel?: string;
   agentRead?: {
@@ -220,7 +221,7 @@ export async function POST(req: NextRequest) {
   // a defensible as-is/repaired call that reflects the real buyer pool).
   let analysis: ReportAnalysis | null = null;
   if (hasAnalysisKey()) {
-    const sourceDocs = meta.orderNumber ? await fetchOrderDocsText(meta.orderNumber) : "";
+    const sourceDocs = meta.sourceDocsText || (meta.orderNumber ? await fetchOrderDocsText(meta.orderNumber) : "");
     try {
       analysis = await runAnalysis({
         sourceDocsText: sourceDocs || undefined,
