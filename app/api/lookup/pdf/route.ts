@@ -506,7 +506,9 @@ export async function POST(req: NextRequest) {
     ctx.y = kTop - rows * 12 - 8;
   }
 
-  // Red flags
+  // Red flags + value summary — SKIP when the value engine ran (it renders its own
+  // authoritative flag table + one value on page 1; these old lines would contradict).
+  if (!analysis) {
   text(ctx, `RED FLAGS — ${report.criticalCount} critical · ${report.advisoryCount} advisory`, { size: 10, font: bold, color: NAVY, gap: 3 });
   if (report.flags.length === 0) {
     text(ctx, "No critical or advisory market flags from available data.", { size: 9, gap: 4 });
@@ -527,6 +529,7 @@ export async function POST(req: NextRequest) {
   }
   ctx.y -= 2;
   text(ctx, report.marketSupportLine, { size: 8, color: LIGHT });
+  }
 
   // ===================== PAGE 2 — REAL MARKET (§2) =====================
   newPage(ctx, true);

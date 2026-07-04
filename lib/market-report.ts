@@ -294,7 +294,7 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     { label: "Year built", value: s.yearBuilt ? String(s.yearBuilt) : "—" },
     { label: "Beds / baths", value: `${s.beds ?? "—"} / ${s.baths ?? "—"}` },
     { label: "Living area", value: s.sqft ? `${s.sqft.toLocaleString()} sqft` : "—" },
-    { label: "Lot size", value: s.lotSize ? `${s.lotSize.toLocaleString()} sqft` : "—" },
+    { label: "Lot size", value: s.lotSize ? (s.lotSize < 100 ? `${s.lotSize} ac` : `${s.lotSize.toLocaleString()} sqft`) : "—" },
     { label: "Last sale", value: s.lastSalePrice ? `${usd(s.lastSalePrice)}${s.lastSaleDate ? " · " + s.lastSaleDate : ""}` : "—" },
     { label: "Tax assessed", value: usd(s.taxAssessedValue) },
   ];
@@ -350,7 +350,7 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
     { label: "Supportable rent (range)", value: rent && (rent.low || rent.high) ? `${usd(rent.low ?? rent.estimate)} – ${usd(rent.high ?? rent.estimate)} /mo` : UNKNOWN },
     { label: "Tax assessed value", value: usd(s.taxAssessedValue) },
     { label: "Beds / baths", value: `${s.beds ?? "—"} / ${s.baths ?? "—"}` },
-    { label: "Living area / lot", value: `${s.sqft ? s.sqft.toLocaleString() + " sqft" : "—"}${s.lotSize ? " / " + s.lotSize.toLocaleString() + " sqft lot" : ""}` },
+    { label: "Living area / lot", value: `${s.sqft ? s.sqft.toLocaleString() + " sqft" : "—"}${s.lotSize ? " / " + (s.lotSize < 100 ? s.lotSize + " ac lot" : s.lotSize.toLocaleString() + " sqft lot") : ""}` },
     { label: "Year built", value: s.yearBuilt ? String(s.yearBuilt) : "—" },
     { label: "Last sale", value: s.lastSalePrice ? `${usd(s.lastSalePrice)}${s.lastSaleDate ? " · " + s.lastSaleDate : ""}` : UNKNOWN },
     { label: "Median sold $/sqft", value: value.perSqftLow !== null && value.perSqftHigh !== null ? `$${value.perSqftLow} – $${value.perSqftHigh}` : UNKNOWN },
