@@ -39,6 +39,11 @@ export interface Order {
   assigned_agent: string | null;
   loan_amount: number | null;
   notes: string | null;
+  paid: boolean | null;
+  paid_at: string | null;
+  amount_cents: number | null;
+  stripe_session_id: string | null;
+  customer_email: string | null;
   created_at: string;
   updated_at: string;
 }
