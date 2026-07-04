@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
     const hrowsAll: [string, string][] = [
       ["Parcel ID", h.parcelId],
       ["Legal", h.legal],
-      ["Owner of record", h.ownerOfRecord !== "—" ? h.ownerOfRecord : (s.ownerNames && s.ownerNames.length ? s.ownerNames.join(", ") : "—")],
+      ["Owner of record", s.ownerNames && s.ownerNames.length ? s.ownerNames.join("; ") : h.ownerOfRecord],
       ["Foreclosure", forec || "—"],
       ["Report · Field agent", `${reportDate}  ·  Alabama Realty Servicing`],
     ];
