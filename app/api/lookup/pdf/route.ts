@@ -431,11 +431,35 @@ export async function POST(req: NextRequest) {
     text(ctx, analysis.marketRead, { size: 8.5, gap: 5 });
   }
 
-  // DISPOSITION — the specific call, with dollars
+  // THE PATHS & ECONOMICS — factual, not a recommendation
   if (analysis?.dispositionCall) {
     ensure(ctx, 14);
-    text(ctx, "DISPOSITION", { size: 9, font: bold, color: rgb(0.07, 0.4, 0.3), gap: 2 });
+    text(ctx, "THE PATHS & ECONOMICS", { size: 9, font: bold, color: rgb(0.07, 0.4, 0.3), gap: 2 });
     text(ctx, analysis.dispositionCall, { size: 8.5, color: rgb(0.1, 0.3, 0.22), gap: 6 });
+  }
+
+  // FOR YOUR DECISION — the facts a buyer/owner needs, on page 1 (data, not advice)
+  if (analysis && (analysis.competition || analysis.biggestObstacle || analysis.biggestRisk || analysis.areaDifference)) {
+    ensure(ctx, 14);
+    text(ctx, "FOR YOUR DECISION", { size: 9, font: bold, color: NAVY, gap: 2 });
+    const facts: [string, string][] = [
+      ["What makes this area different", analysis.areaDifference],
+      ["Biggest competition", analysis.competition],
+      ["Biggest obstacle", analysis.biggestObstacle],
+      ["Biggest risk", analysis.biggestRisk],
+    ];
+    for (const [k, v] of facts) {
+      if (!v) continue;
+      ensure(ctx, 11);
+      ctx.page.drawText(`${k}:`, { x: MARGIN, y: ctx.y - 8, size: 8, font: bold, color: SLATE });
+      for (const [i, l] of wrap(v, font, 8, CONTENT_W - 150).entries()) {
+        if (i > 0) ensure(ctx, 10);
+        ctx.page.drawText(l, { x: MARGIN + 150, y: ctx.y - 8, size: 8, font, color: rgb(0.3, 0.3, 0.3) });
+        ctx.y -= 10;
+      }
+      ctx.y -= 1;
+    }
+    ctx.y -= 5;
   }
 
   // REAL MARKET callout (v1.1 page-1 differentiator)
@@ -628,9 +652,21 @@ export async function POST(req: NextRequest) {
   else text(ctx, "No active listings in the window.", { size: 8, color: LIGHT, gap: 6 });
 
   text(ctx, "THREE LENSES", { size: 9, font: bold, color: NAVY, gap: 3 });
-  for (const l of intel.lenses) {
-    text(ctx, l.lens.toUpperCase(), { size: 7.5, font: bold, color: LIGHT, gap: 1 });
-    text(ctx, l.takeaway, { size: 9, indent: 4, gap: 5 });
+  if (analysis) {
+    const lenses: [string, string][] = [
+      ["INVESTOR", `As-is (cash) ${usd(vAsIsLow)}–${usd(vAsIsHigh)}; repaired ceiling ${usd(vRepLow)}–${usd(vRepHigh)}; spread ~${usd(analysis.spread)}.${analysis.competition ? " Competition: " + analysis.competition : ""}`],
+      ["LENDER", `As-is collateral ${usd(vAsIsLow)}–${usd(vAsIsHigh)}. Financeable as-is: ${analysis.financeable === false ? "no — buyer pool is " + (analysis.buyerPool || "cash/hard-money") : "yes"}.${analysis.biggestObstacle ? " Title: " + analysis.biggestObstacle : ""}`],
+      ["END USER", analysis.financeable === false ? `Not an owner-occupant purchase as-is (fails FHA/conventional); the finished product sells in the ${usd(vRepLow)}–${usd(vRepHigh)} retail band.` : `Financeable; comparable homes clear in the ${usd(vRepLow)}–${usd(vRepHigh)} band.`],
+    ];
+    for (const [k, v] of lenses) {
+      text(ctx, k, { size: 7.5, font: bold, color: LIGHT, gap: 1 });
+      text(ctx, v, { size: 9, indent: 4, gap: 5 });
+    }
+  } else {
+    for (const l of intel.lenses) {
+      text(ctx, l.lens.toUpperCase(), { size: 7.5, font: bold, color: LIGHT, gap: 1 });
+      text(ctx, l.takeaway, { size: 9, indent: 4, gap: 5 });
+    }
   }
 
   // ===================== TAX RECORD vs REALITY (§3) + PROPERTY + CONDITION =====================
@@ -656,8 +692,12 @@ export async function POST(req: NextRequest) {
   text(ctx, "PROPERTY", { size: 9, font: bold, color: NAVY, gap: 3 });
   for (const f of report.propertyFacts) {
     ensure(ctx, 12);
+    const val =
+      analysis && f.label === "Beds / baths" && (analysis.trueBeds != null || analysis.trueBaths != null)
+        ? `${analysis.trueBeds ?? "—"} / ${analysis.trueBaths ?? "—"} (field-verified)`
+        : f.value;
     ctx.page.drawText(f.label, { x: MARGIN, y: ctx.y - 8, size: 8.5, font, color: LIGHT });
-    ctx.page.drawText(f.value, { x: MARGIN + 130, y: ctx.y - 8, size: 8.5, font: bold, color: SLATE });
+    ctx.page.drawText(val, { x: MARGIN + 130, y: ctx.y - 8, size: 8.5, font: bold, color: SLATE });
     ctx.y -= 12;
   }
   ctx.y -= 6;
@@ -700,7 +740,7 @@ export async function POST(req: NextRequest) {
       }
       ensure(ctx, 22);
       text(ctx, `Estimated repairs: ${usd(repairLow)} – ${usd(repairHigh)}`, { size: 8.5, font: bold, color: rgb(0.55, 0.32, 0.02), gap: 1 });
-      text(ctx, `Repaired / ARV value ${usd(arvLow)} – ${usd(arvHigh)}   less repairs   =   As-is value ${usd(asIsLow)} – ${usd(asIsHigh)}`, { size: 8.5, font: bold, color: NAVY, gap: 3 });
+      text(ctx, `As-is value ${usd(vAsIsLow)} – ${usd(vAsIsHigh)}   ·   repaired / ARV ${usd(vRepLow)} – ${usd(vRepHigh)}`, { size: 8.5, font: bold, color: NAVY, gap: 3 });
     }
     if (analysis?.conditionToValue) {
       ctx.y -= 2;

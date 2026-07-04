@@ -31,6 +31,10 @@ export interface ReportAnalysis {
   repairedHigh: number | null;
   spread: number | null;
   dispositionCall: string;
+  competition: string;
+  biggestObstacle: string;
+  biggestRisk: string;
+  areaDifference: string;
   excludedComps: string[];
 }
 
@@ -67,10 +71,14 @@ const SCHEMA = {
     repairedLow: { type: "number", description: "Repaired / retail range low." },
     repairedHigh: { type: "number" },
     spread: { type: "number", description: "Repaired center − as-is center, dollars (the rehab opportunity/risk)." },
-    dispositionCall: { type: "string", description: "Directional call + paths (as-is / repair-and-list / quick sale) with the math." },
+    dispositionCall: { type: "string", description: "The value paths as FACTUAL ECONOMICS with numbers — NO directives, no 'list at'/'do not list'. As-is cash-investor range; repair-and-list (repaired ceiling, rehab budget, net-to-retail math); wholesale floor. Present each path's economics; the client decides." },
+    competition: { type: "string", description: "The subject's biggest competition, as a FACT: the comparable inventory it competes with at resale (e.g. 'renovated 3/2s at $390-435k; 18 sold in 6 mo') — what the buyer/seller is up against." },
+    biggestObstacle: { type: "string", description: "The single biggest obstacle, as a FACT (e.g. the active redemption right / title path)." },
+    biggestRisk: { type: "string", description: "The single biggest risk, as a FACT (e.g. unknown basement scope drives the rehab budget)." },
+    areaDifference: { type: "string", description: "What makes THIS home / area different, factually — the submarket's character, demand, price tier, absorption (why buyers pay here). Not people." },
     excludedComps: { type: "array", items: { type: "string" }, description: "Comps excluded as anchors + why (auction, non-arm's-length, condition-mismatch, outlier). Empty if none." },
   },
-  required: ["verdictLine", "riskGrade", "riskLabel", "bottomLine", "marketRead", "redFlags", "conditionToValue", "buyerPool", "subjectTier", "dispositionCall"],
+  required: ["verdictLine", "riskGrade", "riskLabel", "bottomLine", "marketRead", "redFlags", "conditionToValue", "trueBeds", "trueBaths", "buyerPool", "subjectTier", "asIsLow", "asIsHigh", "repairedLow", "repairedHigh", "spread", "dispositionCall", "competition", "biggestObstacle", "biggestRisk", "areaDifference"],
 } as const;
 
 export function hasAnalysisKey(): boolean {
@@ -129,6 +137,10 @@ export async function runAnalysis(payload: Record<string, unknown>): Promise<Rep
     repairedHigh: num(d.repairedHigh),
     spread: num(d.spread),
     dispositionCall: d.dispositionCall ?? "",
+    competition: d.competition ?? "",
+    biggestObstacle: d.biggestObstacle ?? "",
+    biggestRisk: d.biggestRisk ?? "",
+    areaDifference: d.areaDifference ?? "",
     excludedComps: strs(d.excludedComps),
   };
 }
