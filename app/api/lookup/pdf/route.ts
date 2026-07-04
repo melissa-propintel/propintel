@@ -296,7 +296,7 @@ export async function POST(req: NextRequest) {
     const hrowsAll: [string, string][] = [
       ["Parcel ID", h.parcelId],
       ["Legal", h.legal],
-      ["Owner of record", h.ownerOfRecord],
+      ["Owner of record", h.ownerOfRecord !== "—" ? h.ownerOfRecord : (s.ownerNames && s.ownerNames.length ? s.ownerNames.join(", ") : "—")],
       ["Foreclosure", forec || "—"],
       ["Report · Field agent", `${reportDate}  ·  Alabama Realty Servicing`],
     ];
@@ -710,20 +710,24 @@ export async function POST(req: NextRequest) {
   if (analysis) {
     const tr = analysis.taxRecord;
     text(ctx, "TAX / PUBLIC RECORD SUMMARY", { size: 9, font: bold, color: NAVY, gap: 2 });
+    // Public-record basics fill deterministically from the Rentcast subject data;
+    // the CRS-only fields come from the docs via the engine (— until a CRS is uploaded).
+    const pick2 = (a: string, b: string) => (a && a !== "—" ? a : b);
     const trRowsAll: [string, string][] = [
-      ["Year built", tr.yearBuilt],
+      ["Year built", pick2(tr.yearBuilt, s.yearBuilt ? String(s.yearBuilt) : "—")],
       ["Beds / baths (record)", tr.bedsBaths],
-      ["Square footage", tr.sqft],
-      ["Lot size", tr.lotSize],
+      ["Square footage", pick2(tr.sqft, s.sqft ? `${s.sqft.toLocaleString()} sqft` : "—")],
+      ["Lot size", pick2(tr.lotSize, s.lotSize ? (s.lotSize < 100 ? `${s.lotSize} ac` : `${s.lotSize.toLocaleString()} sqft`) : "—")],
       ["Construction", tr.construction],
       ["HVAC", tr.hvac],
       ["Utilities", tr.utilities],
       ["Zoning", tr.zoning],
       ["FEMA flood zone", tr.floodZone],
-      ["Tax appraisal", tr.taxAppraisal],
+      ["Tax appraisal", pick2(tr.taxAppraisal, s.taxAssessedValue != null ? usd(s.taxAssessedValue) : "—")],
       ["Assessment", tr.assessment],
       ["Annual taxes", tr.annualTaxes],
       ["Payment history", tr.paymentHistory],
+      ["Last sale", s.lastSalePrice != null ? `${usd(s.lastSalePrice)}${s.lastSaleDate ? " · " + s.lastSaleDate : ""}` : "—"],
     ];
     const trRows = trRowsAll.filter(([, v]) => v && v !== "—");
     for (const [k, v] of trRows) {
