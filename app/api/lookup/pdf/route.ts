@@ -438,16 +438,22 @@ export async function POST(req: NextRequest) {
     text(ctx, analysis.dispositionCall, { size: 8.5, color: rgb(0.1, 0.3, 0.22), gap: 6 });
   }
 
-  // FOR YOUR DECISION — the facts a buyer/owner needs, on page 1 (data, not advice)
-  if (analysis && (analysis.competition || analysis.biggestObstacle || analysis.biggestRisk || analysis.areaDifference)) {
+  // FOR YOUR DECISION — the facts a buyer/owner needs, on page 1 (data, not advice).
+  // Fall back to the always-filled red flags so the section can never come up empty.
+  if (analysis) {
+    const crit = analysis.redFlags.filter((f) => f.severity === "CRITICAL");
+    const adv = analysis.redFlags.filter((f) => f.severity === "ADVISORY");
+    const obstacle = analysis.biggestObstacle || (crit[0] ? `${crit[0].category}: ${crit[0].finding}` : "");
+    const risk = analysis.biggestRisk || (adv[0] ? `${adv[0].category}: ${adv[0].finding}` : crit[1] ? `${crit[1].category}: ${crit[1].finding}` : "");
+    const area = analysis.areaDifference || analysis.marketRead;
+    const facts: [string, string][] = [
+      ["What makes this area different", area],
+      ["Biggest competition", analysis.competition],
+      ["Biggest obstacle", obstacle],
+      ["Biggest risk", risk],
+    ];
     ensure(ctx, 14);
     text(ctx, "FOR YOUR DECISION", { size: 9, font: bold, color: NAVY, gap: 2 });
-    const facts: [string, string][] = [
-      ["What makes this area different", analysis.areaDifference],
-      ["Biggest competition", analysis.competition],
-      ["Biggest obstacle", analysis.biggestObstacle],
-      ["Biggest risk", analysis.biggestRisk],
-    ];
     for (const [k, v] of facts) {
       if (!v) continue;
       ensure(ctx, 11);
