@@ -44,6 +44,7 @@ export interface Order {
   amount_cents: number | null;
   stripe_session_id: string | null;
   customer_email: string | null;
+  delivery_token: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -60,7 +60,7 @@ export async function POST(req: Request) {
   // Mark the orders invoiced (they flip to paid on the invoice.paid webhook).
   await supabase
     .from("orders")
-    .update({ stripe_session_id: invoice.id, status: "in_progress" })
+    .update({ stripe_session_id: invoice.id, status: "in_progress", customer_email: customerEmail })
     .in("order_number", orderNumbers);
 
   return NextResponse.json({

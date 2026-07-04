@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
-import { createOrder, generateOrderNumber, type ProductType } from "@/lib/orders";
+import { useEffect, useState } from "react";
+import { createOrder, updateOrder, generateOrderNumber, type ProductType } from "@/lib/orders";
+import { getSupabase } from "@/lib/supabase-browser";
 import { priceFor, usd } from "@/lib/pricing";
 
 const PRODUCTS: { key: ProductType; name: string; blurb: string }[] = [
@@ -16,6 +17,12 @@ export default function OrderPage() {
   const [notes, setNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    const s = getSupabase();
+    s?.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null)).catch(() => {});
+  }, []);
 
   async function submit() {
     if (!address.trim()) {
@@ -26,7 +33,7 @@ export default function OrderPage() {
     setErr(null);
     try {
       const orderNumber = generateOrderNumber();
-      await createOrder({
+      const created = await createOrder({
         order_number: orderNumber,
         client_name: null,
         property_address: address.trim(),
@@ -34,6 +41,9 @@ export default function OrderPage() {
         loan_amount: null,
         notes: notes.trim() || null,
       });
+      if (email && created?.id) {
+        await updateOrder(created.id, { customer_email: email }).catch(() => {});
+      }
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

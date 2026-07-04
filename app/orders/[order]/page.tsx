@@ -171,8 +171,8 @@ export default function WorkOrderPage() {
       const token = makeToken();
       const item = await uploadReport(token, 0, order.property_address, blob, { valueLow: v?.valueRange?.low, valueHigh: v?.valueRange?.high });
       await createDelivery(token, order.client_name, [item]);
-      await updateOrder(order.id, { status: "delivered" });
-      setOrder((o) => (o ? { ...o, status: "delivered" } : o));
+      await updateOrder(order.id, { status: "delivered", delivery_token: token });
+      setOrder((o) => (o ? { ...o, status: "delivered", delivery_token: token } : o));
       if (order.customer_email) {
         fetch("/api/deliver-email", {
           method: "POST",
