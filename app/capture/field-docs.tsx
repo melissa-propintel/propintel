@@ -32,6 +32,9 @@ export function FieldDocs({ folder }: { folder: string }) {
   const [strategy, setStrategy] = useState("");
   const [areaComparison, setAreaComparison] = useState("");
   const [comments, setComments] = useState("");
+  const [inspectionType, setInspectionType] = useState("Exterior only — drive-by");
+  const [inspectionDate, setInspectionDate] = useState("");
+  const [occupancy, setOccupancy] = useState("Unknown");
   const [saved, setSaved] = useState(false);
 
   async function onPick(key: DocKey, file?: File) {
@@ -60,6 +63,9 @@ export function FieldDocs({ folder }: { folder: string }) {
         strategy,
         areaComparison,
         comments,
+        inspectionType,
+        inspectionDate,
+        occupancy,
         updatedAt: new Date().toISOString(),
       });
       await supabase.storage
@@ -117,6 +123,28 @@ export function FieldDocs({ folder }: { folder: string }) {
         <p className="text-sm font-medium text-pi-navy">
           Your read <span className="font-normal text-slate-400">(optional — we can complete the report without it)</span>
         </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Inspection type</label>
+            <select value={inspectionType} onChange={(e) => setInspectionType(e.target.value)} className={inputCls}>
+              <option>Exterior only — drive-by</option>
+              <option>Exterior + interior walk</option>
+              <option>Interior — full access</option>
+            </select>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Inspection date</label>
+            <input type="date" value={inspectionDate} onChange={(e) => setInspectionDate(e.target.value)} className={inputCls} />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Occupancy</label>
+            <select value={occupancy} onChange={(e) => setOccupancy(e.target.value)} className={inputCls}>
+              <option>Unknown</option>
+              <option>Occupied</option>
+              <option>Vacant</option>
+            </select>
+          </div>
+        </div>
         <div>
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Recommended price</label>
           <input value={price} onChange={(e) => setPrice(e.target.value)} placeholder="$" className={inputCls} />

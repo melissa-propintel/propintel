@@ -155,6 +155,7 @@ interface Meta {
   clientName?: string;
   orderNumber?: string;
   serviceLine?: string;
+  serviceLineLabel?: string;
   testValue?: number | null;
   testLabel?: string;
   agentRead?: {
@@ -162,6 +163,9 @@ interface Meta {
     strategy?: string;
     areaComparison?: string;
     comments?: string;
+    inspectionType?: string;
+    inspectionDate?: string;
+    occupancy?: string;
   };
 }
 
@@ -271,7 +275,7 @@ export async function POST(req: NextRequest) {
   // ===================== PAGE 1 — THE VERDICT =====================
   ctx.page.drawRectangle({ x: 0, y: PAGE_H - 56, width: PAGE_W, height: 56, color: NAVY });
   ctx.page.drawText("PROPINTEL", { x: MARGIN, y: PAGE_H - 30, size: 16, font: bold, color: WHITE });
-  const hdr = "Market Intelligence Report";
+  const hdr = meta.serviceLineLabel || "Market Intelligence Report";
   ctx.page.drawText(hdr, {
     x: PAGE_W - MARGIN - font.widthOfTextAtSize(hdr, 9),
     y: PAGE_H - 26,
@@ -293,11 +297,16 @@ export async function POST(req: NextRequest) {
   if (analysis?.header) {
     const h = analysis.header;
     const forec = [h.auctionDate !== "—" ? `auction ${h.auctionDate}` : "", h.filingDate !== "—" ? `filing ${h.filingDate}` : ""].filter(Boolean).join("  ·  ");
+    const ar = meta.agentRead;
+    const insp = ar
+      ? [ar.inspectionDate, ar.inspectionType, ar.occupancy && ar.occupancy !== "Unknown" ? `${ar.occupancy}` : ""].filter(Boolean).join("  ·  ")
+      : "";
     const hrowsAll: [string, string][] = [
       ["Parcel ID", h.parcelId],
       ["Legal", h.legal],
       ["Owner of record", s.ownerNames && s.ownerNames.length ? s.ownerNames.join("; ") : h.ownerOfRecord],
       ["Foreclosure", forec || "—"],
+      ["Inspection", insp || "—"],
       ["Report · Field agent", `${reportDate}  ·  Alabama Realty Servicing`],
     ];
     const hrows = hrowsAll.filter(([, v]) => v && v !== "—");

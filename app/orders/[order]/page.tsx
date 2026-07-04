@@ -22,7 +22,15 @@ const STATUS_COLOR: Record<OrderStatus, string> = {
 };
 
 type Summary = { compsExtracted: number; active: number; sold: number; docs: number };
-type FieldData = { recommendedPrice?: string; strategy?: string; areaComparison?: string; comments?: string };
+type FieldData = { recommendedPrice?: string; strategy?: string; areaComparison?: string; comments?: string; inspectionType?: string; inspectionDate?: string; occupancy?: string };
+
+const REPORT_TYPES = [
+  "Market Intelligence Report",
+  "REO Initial Report",
+  "REO Disposition Report",
+  "BPO / Valuation",
+  "Pre-Origination Field Report",
+];
 
 export default function WorkOrderPage() {
   const params = useParams();
@@ -35,6 +43,7 @@ export default function WorkOrderPage() {
   const [extracting, setExtracting] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [reportType, setReportType] = useState(REPORT_TYPES[0]);
   const [err, setErr] = useState<string | null>(null);
   const [intel, setIntel] = useState<unknown | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -98,7 +107,7 @@ export default function WorkOrderPage() {
       const res = await fetch("/api/lookup/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intel, meta: { orderNumber, clientName: order?.client_name, agentRead: field ?? undefined } }),
+        body: JSON.stringify({ intel, meta: { orderNumber, clientName: order?.client_name, serviceLineLabel: reportType, agentRead: field ?? undefined } }),
       });
       if (!res.ok) {
         setErr("PDF build failed — try again in a moment.");
@@ -212,6 +221,16 @@ export default function WorkOrderPage() {
                   {field.comments && <p>{field.comments}</p>}
                 </div>
               )}
+              <select
+                value={reportType}
+                onChange={(e) => setReportType(e.target.value)}
+                className="mr-3 rounded-lg border border-pi-border px-3 py-2.5 text-sm text-pi-slate"
+                title="Report type / service line"
+              >
+                {REPORT_TYPES.map((r) => (
+                  <option key={r}>{r}</option>
+                ))}
+              </select>
               <button
                 onClick={downloadPdf}
                 disabled={downloading}
