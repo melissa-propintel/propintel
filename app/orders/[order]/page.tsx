@@ -10,6 +10,7 @@ import {
   type Order,
   type OrderStatus,
 } from "@/lib/orders";
+import { priceFor, usd } from "@/lib/pricing";
 
 const APP = "https://propintelreport.com";
 
@@ -129,6 +130,41 @@ export default function WorkOrderPage() {
     }
   }
 
+  async function payNow() {
+    if (!order) return;
+    setErr(null);
+    const res = await fetch("/api/checkout", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderNumber }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.location.href = data.url;
+      return;
+    }
+    setErr(data.error || "Payments aren't set up yet — the order is saved; you can invoice it.");
+  }
+
+  async function sendInvoice() {
+    if (!order) return;
+    const email = window.prompt("Client email to send the invoice to (net-30):", order.customer_email || "");
+    if (!email) return;
+    setErr(null);
+    const res = await fetch("/api/invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderNumbers: [orderNumber], customerEmail: email, customerName: order.client_name || undefined }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.open(data.url, "_blank");
+      window.alert(`Invoice sent to ${email} — ${data.total}. It'll mark paid automatically when they pay.`);
+      return;
+    }
+    setErr(data.error || "Couldn't create the invoice.");
+  }
+
   const v = intel as { valueRange?: { low: number | null; high: number | null }; ring?: { totalComps: number; radiusReachedMiles: number } } | null;
   const card = "rounded-2xl border border-pi-border bg-white p-5";
 
@@ -148,6 +184,17 @@ export default function WorkOrderPage() {
             </div>
             <p className="mt-0.5 text-sm text-slate-700">{order?.property_address ?? "(order not found)"}</p>
             <p className="text-xs text-pi-slate-mid">{order?.client_name || "—"}{order?.product_type ? ` · ${order.product_type}` : ""}</p>
+            {order && (
+              order.paid ? (
+                <p className="mt-1 text-xs font-semibold text-emerald-700">Paid ✓ {order.amount_cents ? usd(order.amount_cents) : ""}{order.paid_at ? ` · ${new Date(order.paid_at).toLocaleDateString()}` : ""}</p>
+              ) : (
+                <div className="mt-1.5 flex items-center gap-2">
+                  <span className="text-xs font-medium text-amber-700">Unpaid — {usd(priceFor(order.product_type).cents)}</span>
+                  <button onClick={payNow} className="rounded-md bg-pi-green-deep px-3 py-1 text-xs font-semibold text-white hover:bg-pi-navy-soft">Pay now</button>
+                  <button onClick={sendInvoice} className="rounded-md border border-pi-green-deep px-3 py-1 text-xs font-semibold text-pi-green-deep hover:bg-pi-green-pale">Invoice</button>
+                </div>
+              )
+            )}
           </div>
           {order && (
             <select

@@ -41,6 +41,38 @@ export default function OrdersPage() {
   const [sendMsg, setSendMsg] = useState<Record<string, string>>({});
   const [condMsg, setCondMsg] = useState<Record<string, string>>({});
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [invEmail, setInvEmail] = useState("");
+  const [invMsg, setInvMsg] = useState<string | null>(null);
+
+  function toggleSel(num: string) {
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(num)) n.delete(num);
+      else n.add(num);
+      return n;
+    });
+  }
+
+  async function bulkInvoice() {
+    const nums = [...selected];
+    if (nums.length === 0) return setInvMsg("Select orders first.");
+    if (!invEmail.trim()) return setInvMsg("Enter the client email.");
+    setInvMsg("Sending invoice…");
+    const res = await fetch("/api/invoice", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ orderNumbers: nums, customerEmail: invEmail.trim() }),
+    });
+    const data = await res.json();
+    if (data.url) {
+      window.open(data.url, "_blank");
+      setInvMsg(`Invoice sent — ${data.count} report${data.count === 1 ? "" : "s"}, ${data.total}. Marks paid when they pay.`);
+      setSelected(new Set());
+      return;
+    }
+    setInvMsg(data.error || "Couldn't create the invoice.");
+  }
 
   async function refresh() {
     if (!configured) {
@@ -244,14 +276,25 @@ export default function OrdersPage() {
             <p className="text-sm text-slate-500">No orders yet. Create one above.</p>
           ) : (
             <div className="flex flex-col gap-2">
+              {selected.size > 0 && (
+                <div className="mb-1 flex flex-wrap items-center gap-2 rounded-lg border border-pi-green-deep bg-pi-green-pale p-3">
+                  <span className="text-sm font-semibold text-pi-green-dark">{selected.size} selected</span>
+                  <input value={invEmail} onChange={(e) => setInvEmail(e.target.value)} placeholder="Client email for the invoice" className="min-w-[200px] flex-1 rounded border border-pi-border px-2 py-1.5 text-sm" />
+                  <button onClick={bulkInvoice} className="rounded-lg bg-pi-green-deep px-4 py-1.5 text-sm font-semibold text-white hover:bg-pi-navy-soft">Send invoice (net-30)</button>
+                  <button onClick={() => setSelected(new Set())} className="text-xs text-pi-slate-mid hover:underline">clear</button>
+                  {invMsg && <span className="w-full text-xs text-pi-slate-mid">{invMsg}</span>}
+                </div>
+              )}
               {orders.map((o) => (
                 <div key={o.id} className="rounded-lg border border-pi-border bg-white p-3">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
+                        <input type="checkbox" checked={selected.has(o.order_number)} onChange={() => toggleSel(o.order_number)} title="Select for invoicing" />
                         <Link href={`/orders/${encodeURIComponent(o.order_number)}`} className="text-sm font-bold text-pi-navy hover:underline">{o.order_number}</Link>
                         <span className={`rounded px-1.5 py-0.5 text-[10px] font-bold uppercase ${STATUS_COLOR[o.status]}`}>{o.status.replace("_", " ")}</span>
                         <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">{o.product_type}</span>
+                        {o.paid && <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">PAID</span>}
                       </div>
                       <Link href={`/orders/${encodeURIComponent(o.order_number)}`} className="mt-0.5 block text-sm text-slate-700 hover:underline">{o.property_address}</Link>
                       <p className="text-xs text-slate-500">{o.client_name || "—"}{o.loan_amount ? ` · loan $${o.loan_amount.toLocaleString()}` : ""}</p>

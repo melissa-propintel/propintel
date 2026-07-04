@@ -22,13 +22,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bad signature" }, { status: 400 });
   }
 
-  if (event.type === "checkout.session.completed") {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const supabase = url && anon ? createClient(url, anon) : null;
+
+  if (supabase && event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;
     const orderNumber = session.metadata?.order_number;
-    const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-    if (orderNumber && url && anon) {
-      const supabase = createClient(url, anon);
+    if (orderNumber) {
       await supabase
         .from("orders")
         .update({
@@ -40,6 +41,18 @@ export async function POST(req: Request) {
           status: "in_progress",
         })
         .eq("order_number", orderNumber);
+    }
+  }
+
+  // Portfolio / invoice payment — mark every order on that invoice paid.
+  if (supabase && event.type === "invoice.paid") {
+    const invoice = event.data.object as Stripe.Invoice;
+    const nums = (invoice.metadata?.order_numbers ?? "").split(",").map((n) => n.trim()).filter(Boolean);
+    if (nums.length) {
+      await supabase
+        .from("orders")
+        .update({ paid: true, paid_at: new Date().toISOString(), status: "in_progress" })
+        .in("order_number", nums);
     }
   }
   return NextResponse.json({ received: true });
