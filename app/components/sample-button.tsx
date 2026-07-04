@@ -1,10 +1,5 @@
-"use client";
-
-import { useRouter } from "next/navigation";
-import { sampleIntake } from "@/lib/sample-intake";
-import { buildReport } from "@/lib/report-builder";
-import { saveReportToSession } from "@/lib/default-intake";
-
+// Opens a real, generated Property Intelligence Report as the sample.
+// Swap public/sample-report.pdf to change what prospects see.
 export function SampleButton({
   className,
   children,
@@ -12,15 +7,9 @@ export function SampleButton({
   className?: string;
   children: React.ReactNode;
 }) {
-  const router = useRouter();
-  function load() {
-    const report = buildReport(sampleIntake(), new Date().toISOString());
-    saveReportToSession(report, sampleIntake());
-    router.push("/report");
-  }
   return (
-    <button onClick={load} className={className}>
+    <a href="/sample-report.pdf" target="_blank" rel="noopener noreferrer" className={className}>
       {children}
-    </button>
+    </a>
   );
 }
