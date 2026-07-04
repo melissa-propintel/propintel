@@ -2,7 +2,7 @@
 // Works in Stripe TEST mode until the live keys are set.
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { serviceClient } from "@/lib/supabase/service";
 import { priceFor } from "@/lib/pricing";
 
 export const runtime = "nodejs";
@@ -21,10 +21,8 @@ export async function POST(req: Request) {
   }
   if (!orderNumber) return NextResponse.json({ error: "Missing order" }, { status: 400 });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
-  const supabase = createClient(url, anon);
+  const supabase = serviceClient();
+  if (!supabase) return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
   const { data: order } = await supabase.from("orders").select("*").eq("order_number", orderNumber).maybeSingle();
   if (!order) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   if (order.paid) return NextResponse.json({ error: "This order is already paid." }, { status: 400 });

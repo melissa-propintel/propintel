@@ -2,7 +2,7 @@
 // clients (e.g. 500 desktop reports) who bill rather than card-checkout each one.
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { serviceClient } from "@/lib/supabase/service";
 import { priceFor, portfolioCentsEach, usd } from "@/lib/pricing";
 
 export const runtime = "nodejs";
@@ -23,10 +23,8 @@ export async function POST(req: Request) {
   if (orderNumbers.length === 0) return NextResponse.json({ error: "No orders selected." }, { status: 400 });
   if (!customerEmail) return NextResponse.json({ error: "Client email is required for an invoice." }, { status: 400 });
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url || !anon) return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
-  const supabase = createClient(url, anon);
+  const supabase = serviceClient();
+  if (!supabase) return NextResponse.json({ error: "Storage not configured" }, { status: 500 });
   const { data: orders } = await supabase.from("orders").select("*").in("order_number", orderNumbers);
   if (!orders || orders.length === 0) return NextResponse.json({ error: "Orders not found" }, { status: 404 });
 

@@ -2,7 +2,7 @@
 // Set STRIPE_WEBHOOK_SECRET (from the Stripe dashboard) in the env.
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@supabase/supabase-js";
+import { serviceClient } from "@/lib/supabase/service";
 
 export const runtime = "nodejs";
 
@@ -22,9 +22,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "bad signature" }, { status: 400 });
   }
 
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  const supabase = url && anon ? createClient(url, anon) : null;
+  const supabase = serviceClient();
 
   if (supabase && event.type === "checkout.session.completed") {
     const session = event.data.object as Stripe.Checkout.Session;

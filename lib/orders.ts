@@ -1,7 +1,16 @@
 // Orders — the spine that ties client + property + agent + report together.
-// Persisted in Supabase (table `orders`). Browser-side CRUD via the anon client.
+// Persisted in Supabase (table `orders`). Uses the SESSION-AWARE browser client so
+// the logged-in user's identity flows to RLS (admin sees all; customers see own).
 
-import { getSupabase, isStorageConfigured } from "./supabase-browser";
+import { isStorageConfigured } from "./supabase-browser";
+import { createClient } from "./supabase/client";
+
+let _db: ReturnType<typeof createClient> | null = null;
+function getSupabase() {
+  if (!isStorageConfigured()) return null;
+  if (!_db) _db = createClient();
+  return _db;
+}
 
 export type OrderStatus = "new" | "assigned" | "in_progress" | "ready" | "delivered";
 // "field" is the legacy umbrella value (treated as full); new orders use the split.
@@ -56,6 +65,7 @@ export interface NewOrder {
   product_type: ProductType;
   loan_amount: number | null;
   notes: string | null;
+  customer_email?: string | null;
 }
 
 export function ordersConfigured(): boolean {
