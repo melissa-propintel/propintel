@@ -1,4 +1,4 @@
-// POST { intel, meta? } -> the 3-page "middle" Market Intelligence Report PDF.
+// POST { intel, meta? } -> the Property Intelligence Report PDF.
 //   P1 — The Verdict (rating + red flags)
 //   P2 — Market Reality
 //   P3 — Property & Neighborhood
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
   // ===================== PAGE 1 — THE VERDICT =====================
   ctx.page.drawRectangle({ x: 0, y: PAGE_H - 56, width: PAGE_W, height: 56, color: NAVY });
   ctx.page.drawText("PROPINTEL", { x: MARGIN, y: PAGE_H - 30, size: 16, font: bold, color: WHITE });
-  const hdr = meta.serviceLineLabel || "Market Intelligence Report";
+  const hdr = meta.serviceLineLabel || "Property Intelligence Report";
   ctx.page.drawText(hdr, {
     x: PAGE_W - MARGIN - font.widthOfTextAtSize(hdr, 9),
     y: PAGE_H - 26,
@@ -622,7 +622,7 @@ export async function POST(req: NextRequest) {
 
   // ===================== MARKET INTELLIGENCE (§5) =====================
   newPage(ctx, true);
-  sectionTitle(ctx, "Market Intelligence");
+  sectionTitle(ctx, "Market Analysis");
   text(ctx, "VALUE & METHODOLOGY", { size: 9, font: bold, color: NAVY, gap: 2 });
   if (analysis) {
     text(ctx, `As-is value ${usd(vAsIsLow)} – ${usd(vAsIsHigh)}   ·   Repaired / ARV ${usd(vRepLow)} – ${usd(vRepHigh)}   ·   spread ~${usd(analysis.spread)}.`, { size: 10, font: bold, color: NAVY, gap: 1 });

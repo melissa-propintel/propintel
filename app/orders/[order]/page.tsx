@@ -25,7 +25,7 @@ type Summary = { compsExtracted: number; active: number; sold: number; docs: num
 type FieldData = { recommendedPrice?: string; strategy?: string; areaComparison?: string; comments?: string; inspectionType?: string; inspectionDate?: string; occupancy?: string };
 
 const REPORT_TYPES = [
-  "Market Intelligence Report",
+  "Property Intelligence Report",
   "REO Initial Report",
   "REO Disposition Report",
   "BPO / Valuation",

@@ -168,7 +168,7 @@ export function buildReport(
         : "."),
     intake.market.taxAppraisal ? `Tax appraisal: ${intake.market.taxAppraisal}.` : "",
   ].filter(Boolean);
-  sections.push({ heading: "5. Market Intelligence", body: mktBody });
+  sections.push({ heading: "5. Market Analysis", body: mktBody });
 
   // §6 Condition
   const c = intake.condition;

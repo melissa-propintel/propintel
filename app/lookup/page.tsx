@@ -125,7 +125,7 @@ export default function LookupPage() {
         <span className="text-xs text-slate-400">Automated market intelligence</span>
       </div>
 
-      <h1 className="text-2xl font-black text-pi-navy">Market Intelligence</h1>
+      <h1 className="text-2xl font-black text-pi-navy">Property Intelligence</h1>
       <p className="mt-1 text-sm text-slate-600">
         Type an address. We pull every active and sold comp around it, build the ½-mile ring (expanding
         only if needed), and read the real market — absorption, which price bands move vs. sit, and a

@@ -84,7 +84,7 @@ export const SECTIONS: SectionDef[] = [
   {
     num: 5,
     key: "market-intel",
-    title: "Market Intelligence",
+    title: "Market Analysis",
     appliesTo: "all",
   },
   { num: 6, key: "condition", title: "Condition", appliesTo: "all" },
