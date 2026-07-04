@@ -33,6 +33,8 @@ export default function WorkOrderPage() {
   const [copied, setCopied] = useState(false);
 
   const [extracting, setExtracting] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [downloaded, setDownloaded] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [intel, setIntel] = useState<unknown | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -88,23 +90,34 @@ export default function WorkOrderPage() {
   }
 
   async function downloadPdf() {
-    if (!intel) return;
-    const res = await fetch("/api/lookup/pdf", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intel, meta: { orderNumber, clientName: order?.client_name, agentRead: field ?? undefined } }),
-    });
-    if (!res.ok) {
-      setErr("PDF build failed");
-      return;
+    if (!intel || downloading) return;
+    setDownloading(true);
+    setDownloaded(false);
+    setErr(null);
+    try {
+      const res = await fetch("/api/lookup/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intel, meta: { orderNumber, clientName: order?.client_name, agentRead: field ?? undefined } }),
+      });
+      if (!res.ok) {
+        setErr("PDF build failed — try again in a moment.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `PropIntel-${orderNumber}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setDownloaded(true);
+      setTimeout(() => setDownloaded(false), 6000);
+    } catch {
+      setErr("PDF build failed — try again in a moment.");
+    } finally {
+      setDownloading(false);
     }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `PropIntel-${orderNumber}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   const v = intel as { valueRange?: { low: number | null; high: number | null }; ring?: { totalComps: number; radiusReachedMiles: number } } | null;
@@ -199,9 +212,14 @@ export default function WorkOrderPage() {
                   {field.comments && <p>{field.comments}</p>}
                 </div>
               )}
-              <button onClick={downloadPdf} className="rounded-lg border-[1.5px] border-pi-green-deep px-5 py-2.5 text-sm font-medium text-pi-green-deep hover:bg-pi-green-pale transition">
-                Download report PDF
+              <button
+                onClick={downloadPdf}
+                disabled={downloading}
+                className="rounded-lg border-[1.5px] border-pi-green-deep px-5 py-2.5 text-sm font-medium text-pi-green-deep hover:bg-pi-green-pale transition disabled:opacity-60 disabled:cursor-wait"
+              >
+                {downloading ? "Building report… (10–30s)" : downloaded ? "Downloaded ✓ — check your Downloads" : "Download report PDF"}
               </button>
+              {downloading && <span className="ml-3 text-sm text-pi-green-deep">Running condition + value engine…</span>}
             </div>
           )}
         </section>
