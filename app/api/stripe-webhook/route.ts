@@ -1,8 +1,9 @@
 // Stripe webhook — marks an order paid when checkout completes.
 // Set STRIPE_WEBHOOK_SECRET (from the Stripe dashboard) in the env.
-import { NextResponse } from "next/server";
+import { NextResponse, after } from "next/server";
 import Stripe from "stripe";
 import { serviceClient } from "@/lib/supabase/service";
+import { deliverDesktopOrder } from "@/lib/auto-deliver";
 
 export const runtime = "nodejs";
 
@@ -39,6 +40,11 @@ export async function POST(req: Request) {
           status: "in_progress",
         })
         .eq("order_number", orderNumber);
+
+      // Desktop reports auto-generate + deliver the moment they're paid. Runs in
+      // the background so Stripe still gets a fast response. No-ops for field
+      // reports (they need an inspection first).
+      after(() => deliverDesktopOrder(orderNumber).catch(() => {}));
     }
   }
 
