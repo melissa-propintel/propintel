@@ -178,6 +178,10 @@ export interface MarketIntel {
   rent: RentRead | null;
   /** Auto-pulled neighborhood data (FEMA + Census). Null until fetched. */
   neighborhood: NeighborhoodData | null;
+  /** ZIP-level 12-mo price/DOM trend (Rentcast /markets). Optional; null until fetched. */
+  trend?: import("./market-trend").MarketTrend | null;
+  /** Drive-times to grocery/school/hospital/highway (OSM/OSRM). Optional; null until fetched. */
+  places?: import("./places").PlacesData | null;
   /** True when the result came from built-in sample data (no API key). */
   usingSampleData: boolean;
 }

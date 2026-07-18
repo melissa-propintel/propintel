@@ -6,7 +6,8 @@
 import { NextResponse } from "next/server";
 import { analyzeMarket } from "@/lib/comp-engine";
 import { sampleSubject, sampleComps } from "@/lib/sample-comps";
-import { sampleNeighborhood, fetchNeighborhood } from "@/lib/neighborhood";
+import { sampleNeighborhood } from "@/lib/neighborhood";
+import { enrichMarketIntel } from "@/lib/enrich-intel";
 import { hasRentcastKey, pullMarketData } from "@/lib/rentcast";
 import { buildMarketReport } from "@/lib/market-report";
 import { hasAnthropicKey, extractBpo } from "@/lib/bpo-extract";
@@ -15,6 +16,8 @@ import { auditBpo, type BpoExtract } from "@/lib/audit";
 import type { MarketIntel } from "@/lib/market-data";
 
 export const runtime = "nodejs";
+// Headroom for the slower free open-data servers (OpenStreetMap/OSRM, Census).
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   let address = "";
@@ -52,13 +55,8 @@ export async function POST(req: Request) {
     try {
       const { subject, comps } = await pullMarketData(lookupAddress);
       intel = analyzeMarket(subject, comps, false);
-      if (subject.latitude !== null && subject.longitude !== null) {
-        try {
-          intel.neighborhood = await fetchNeighborhood(subject.latitude, subject.longitude);
-        } catch {
-          /* best-effort */
-        }
-      }
+      // Neighborhood (FEMA + Census) + ZIP trend + drive-times — all free, parallel.
+      await enrichMarketIntel(intel, subject);
     } catch (err) {
       return NextResponse.json(
         { error: err instanceof Error ? err.message : "Market data pull failed." },

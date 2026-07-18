@@ -6,7 +6,11 @@ import { NextResponse } from "next/server";
 import { analyzeMarket } from "@/lib/comp-engine";
 import { sampleSubject, sampleComps } from "@/lib/sample-comps";
 import { hasRentcastKey, pullMarketData } from "@/lib/rentcast";
-import { fetchNeighborhood, sampleNeighborhood } from "@/lib/neighborhood";
+import { sampleNeighborhood } from "@/lib/neighborhood";
+import { enrichMarketIntel } from "@/lib/enrich-intel";
+
+// Headroom for the slower free open-data servers (OpenStreetMap/OSRM, Census).
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   let address = "";
@@ -33,13 +37,8 @@ export async function POST(req: Request) {
     const { subject, comps, rent } = await pullMarketData(address);
     const intel = analyzeMarket(subject, comps, false);
     intel.rent = rent;
-    if (subject.latitude !== null && subject.longitude !== null) {
-      try {
-        intel.neighborhood = await fetchNeighborhood(subject.latitude, subject.longitude);
-      } catch {
-        // neighborhood is best-effort; leave null on failure
-      }
-    }
+    // Neighborhood (FEMA + Census) + ZIP trend + drive-times — all free, parallel.
+    await enrichMarketIntel(intel, subject);
     return NextResponse.json({ intel });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Data pull failed.";

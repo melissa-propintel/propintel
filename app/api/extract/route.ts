@@ -11,6 +11,7 @@ import Anthropic from "@anthropic-ai/sdk";
 import { createClient } from "@supabase/supabase-js";
 import { PHOTO_BUCKET } from "@/lib/photo-shots";
 import { analyzeMarket } from "@/lib/comp-engine";
+import { enrichMarketIntel } from "@/lib/enrich-intel";
 import { hasRentcastKey, pullMarketData, type MarketPull } from "@/lib/rentcast";
 import { mergeSubject, mergeComps } from "@/lib/merge-sources";
 import type { SubjectProperty, Comp, CompStatus } from "@/lib/market-data";
@@ -268,6 +269,8 @@ export async function POST(req: NextRequest) {
   const intel = analyzeMarket(subject, comps, false);
   // Surface Rentcast rent (the "community report" rent) when the docs didn't carry it.
   if (rc?.rent && !intel.rent) intel.rent = rc.rent;
+  // Neighborhood (FEMA + Census) + ZIP trend + drive-times — all free, parallel.
+  await enrichMarketIntel(intel, subject);
 
   // The agent's read (recommended price / strategy / comments), if saved.
   let fieldData: Record<string, unknown> | null = null;

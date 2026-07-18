@@ -311,6 +311,44 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
   neighborhood.push({ label: "Median days on market", value: intel.medianDom !== null ? `${intel.medianDom} DOM` : "—" });
   neighborhood.push({ label: "Active : sold ratio", value: abs.activePerSold !== null ? `${abs.activePerSold} : 1` : "—" });
 
+  // ZIP-level 12-month trend (Rentcast /markets) — direction of the market.
+  const tr = intel.trend;
+  if (tr) {
+    if (tr.medianPrice != null)
+      neighborhood.push({
+        label: "ZIP median list price",
+        value: `${usd(tr.medianPrice)}${
+          tr.medianPriceChangePct != null && tr.monthsCompared > 0
+            ? ` (${tr.medianPriceChangePct > 0 ? "+" : ""}${tr.medianPriceChangePct}% ~${tr.monthsCompared}mo)`
+            : ""
+        }`,
+      });
+    if (tr.medianDom != null)
+      neighborhood.push({
+        label: "ZIP median DOM (12-mo)",
+        value: `${tr.medianDom} days${tr.medianDomPrior != null ? ` (was ${tr.medianDomPrior})` : ""}`,
+      });
+  }
+
+  // Drive-times (OpenStreetMap / OSRM) — the location narrative.
+  const pl = intel.places;
+  if (pl) {
+    const fmtHit = (h: { name: string; minutes: number | null; miles: number | null } | null): string | null => {
+      if (!h) return null;
+      const t = h.minutes !== null ? `${h.minutes} min` : h.miles !== null ? `${h.miles} mi` : null;
+      if (!t) return null;
+      return `${t}${h.name ? ` — ${h.name}` : ""}`;
+    };
+    const g = fmtHit(pl.grocery);
+    const s2 = fmtHit(pl.school);
+    const hosp = fmtHit(pl.hospital);
+    const hw = fmtHit(pl.highway ? { ...pl.highway, name: "on-ramp" } : null);
+    if (g) neighborhood.push({ label: "Nearest grocery", value: g });
+    if (s2) neighborhood.push({ label: "Nearest school", value: s2 });
+    if (hosp) neighborhood.push({ label: "Nearest hospital", value: hosp });
+    if (hw) neighborhood.push({ label: "Highway access", value: hw });
+  }
+
   const hasNbData = !!(nb && (nb.floodZone || nb.vacancyRatePct != null || nb.medianHomeValue != null));
   const pendingNotes = [
     "Condition grade & field photos: from the field agent's inspection (if a field order).",
