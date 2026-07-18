@@ -6,6 +6,7 @@ import { serviceClient } from "@/lib/supabase/service";
 import { deliverDesktopOrder } from "@/lib/auto-deliver";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   const key = process.env.STRIPE_SECRET_KEY;
