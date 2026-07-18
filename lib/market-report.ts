@@ -314,15 +314,20 @@ export function buildMarketReport(intel: MarketIntel, opts: ReportOptions = {}):
   // ZIP-level 12-month trend (Rentcast /markets) — direction of the market.
   const tr = intel.trend;
   if (tr) {
-    if (tr.medianPrice != null)
+    if (tr.medianPrice != null) {
+      // Asking-price direction — NOT a valuation. Thin ZIPs have a noisy % swing.
+      const thin = tr.totalListings == null || tr.totalListings < 25;
       neighborhood.push({
-        label: "ZIP median list price",
+        label: "ZIP median ASKING price (market direction, not value)",
         value: `${usd(tr.medianPrice)}${
-          tr.medianPriceChangePct != null && tr.monthsCompared > 0
+          tr.medianPriceChangePct != null && tr.monthsCompared > 0 && !thin
             ? ` (${tr.medianPriceChangePct > 0 ? "+" : ""}${tr.medianPriceChangePct}% ~${tr.monthsCompared}mo)`
-            : ""
+            : thin
+              ? " (few listings — % unreliable)"
+              : ""
         }`,
       });
+    }
     if (tr.medianDom != null)
       neighborhood.push({
         label: "ZIP median DOM (12-mo)",
